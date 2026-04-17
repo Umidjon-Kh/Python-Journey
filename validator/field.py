@@ -16,7 +16,6 @@ class Field:
 
     __slots__ = (
         "default",
-        "nullable",
         "read_only",
         "min_value",
         "max_value",
@@ -29,7 +28,6 @@ class Field:
     def __init__(
         self,
         default: Optional[Any] = _MISSING,
-        nullable: bool = False,
         read_only: bool = False,
         min_value: Optional[Comparable] = None,
         max_value: Optional[Comparable] = None,
@@ -39,7 +37,6 @@ class Field:
         validator: Callable[[Any], bool] = lambda x: x,
     ) -> None:
         self.default = default
-        self.nullable = nullable
         self.read_only = read_only
         self.min_value = min_value
         self.max_value = max_value
