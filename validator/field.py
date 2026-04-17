@@ -1,4 +1,3 @@
-from os import read
 from typing import Any, Callable, Container, Optional
 
 from .protocols import Comparable
