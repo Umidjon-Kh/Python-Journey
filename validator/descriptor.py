@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from typing import Any, Union, get_args, get_origin
+from typing import Any, Tuple, Union, get_args, get_origin
 from weakref import WeakKeyDictionary
 
 from field import _MISSING, Field
@@ -47,45 +47,106 @@ class ValidatorDescriptor:
         self.conform_value(value)
         self._storage[instance] = value
 
-    def conform_value(self, value: Any) -> None:
-        # validating for type of value
-        pass
-
     @classmethod
-    def _type_checker(cls, value: Any, expected: type) -> bool:
+    def _type_checker(
+        cls,
+        value: Any,
+        expected: type,
+        deep_check: bool = False,
+        _path: str = "root",
+    ) -> Tuple[bool, str]:
         """
-        Checks type of received value for matching to expected type.
-        If expected type is Union or Sequence object
-        recursively checks every value in sequence.
+        Recursively validates that value matches the expected type annotation.
+        Returns (True, "") on success or (False, error_path) on first mismatch.
+
+        Supports:
+            - Primitives:       int, str, float, bool, etc.
+            - Any:              always passes
+            - Union / Optional: passes if any branch matches
+            - Generic aliases:  list[int], dict[str, int], tuple[int, str]
+            - Nested generics:  list[tuple[Union[int, float], str]]
+
+        Args:
+            value:      The value being validated.
+            expected:   The expected type or annotation.
+            deep_check: If True, validates elements inside collections recursively.
+            _path:      Internal — tracks location for error messages.
+                        Do not pass manually.
+
+        Returns:
+            tuple[bool, str]:
+                - (True, "")           → value matches expected
+                - (False, error_path)  → mismatch with full path description
         """
         if expected is Any:
-            return True
+            return (True, "")
 
-        # Getting origin and origin args:
-        # Union[int, float] -> origin = Union, args = (int, float)
         origin = get_origin(expected)
         args = get_args(expected)
 
-        # Checking all args if expected union argument
-        # if matches one of them returns True
         if origin is Union:
-            return any(cls._type_checker(value, t) for t in args)
+            for candidate in args:
+                matched, _ = cls._type_checker(value, candidate, deep_check, _path)
+                if matched:
+                    return (True, "")
+            expected_repr = " | ".join(
+                t.__name__ if hasattr(t, "__name__") else str(t) for t in args
+            )
+            return (
+                False,
+                f"[{_path}]: expected {expected_repr}, got {type(value).__name__!r}",
+            )
 
-        # Guards from origin is None cause type_checker works recursively
         if origin is not None:
             if not isinstance(value, origin):
-                return False
-            # If not args just goes to upper frame.
-            if not args:
-                return True
-            # Checks for dict lika mapping sequences
-            if issubclass(origin, Mapping):
-                return all(
-                    cls._type_checker(k, args[0]) and cls._type_checker(v, args[1])
-                    for k, v in value.items()
+                return (
+                    False,
+                    f"[{_path}]: expected {origin.__name__}, got {type(value).__name__!r}",
                 )
-            # Checks for ordinary sequences
-            if issubclass(origin, Sequence):
-                return all(cls._type_checker(item, args[0]) for item in value)
 
-        return True
+            if not args or not deep_check:
+                return (True, "")
+
+            if issubclass(origin, Mapping):
+                for key, val in value.items():
+                    matched, message = cls._type_checker(
+                        key, args[0], deep_check, f"{_path} → key({key!r})"
+                    )
+                    if not matched:
+                        return (False, message)
+                    matched, message = cls._type_checker(
+                        val, args[1], deep_check, f"{_path} → value({key!r})"
+                    )
+                    if not matched:
+                        return (False, message)
+                return (True, "")
+
+            if issubclass(origin, Sequence):
+                for index, item in enumerate(value):
+                    matched, message = cls._type_checker(
+                        item, args[0], deep_check, f"{_path} → [{index}]"
+                    )
+                    if not matched:
+                        return (False, message)
+                return (True, "")
+
+            return (True, "")
+
+        if not isinstance(value, expected):
+            return (
+                False,
+                f"[{_path}]: expected {expected.__name__!r}, got {type(value).__name__!r}",
+            )
+
+        return (True, "")
+
+    def conform_value(self, value: Any) -> None:
+        """
+        Validates value against the descriptor's annotation and Field specs.
+        Raises TypeError with a full path description if validation fails.
+        """
+        matched, message = self._type_checker(
+            value, self.annotation, self.specs.deep_check
+        )
+        if not matched:
+            raise TypeError(f"'{self.name}': {message}")

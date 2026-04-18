@@ -16,31 +16,34 @@ class Field:
 
     __slots__ = (
         "default",
+        "deep_check",
         "read_only",
         "min_value",
         "max_value",
         "min_length",
         "max_length",
         "choices",
-        "validator",
+        "custom_func",
     )
 
     def __init__(
         self,
         default: Optional[Any] = _MISSING,
+        deep_check: bool = False,
         read_only: bool = False,
         min_value: Optional[Comparable] = None,
         max_value: Optional[Comparable] = None,
         min_lenght: Optional[int] = None,
         max_length: Optional[int] = None,
         choices: Optional[Container] = None,
-        validator: Callable[[Any], bool] = lambda x: x,
+        custom_func: Callable[[Any], bool] = lambda x: x,
     ) -> None:
         self.default = default
+        self.deep_check = deep_check
         self.read_only = read_only
         self.min_value = min_value
         self.max_value = max_value
         self.min_length = min_lenght
         self.max_length = max_length
         self.choices = choices
-        self.validator = validator
+        self.custom_func = custom_func
