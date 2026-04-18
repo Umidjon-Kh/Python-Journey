@@ -2,7 +2,7 @@ from collections.abc import Mapping, Sequence, Sized
 from typing import Any, Tuple, Union, cast, get_args, get_origin
 from weakref import WeakKeyDictionary
 
-from .field import _MISSING, Field
+from .field import Field
 from .protocols import Comparable
 
 

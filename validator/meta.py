@@ -64,7 +64,7 @@ class MetaValidator(type):
                 )
             if specs.default is not _MISSING and specs.default_factory is not None:
                 raise TypeError(
-                    f"{name!r} attribute {field_name!r} must contain default or default_factory not both fields"
+                    f"{name!r} attribute {field_name!r}: cannot set both 'default' and 'default_factory'"
                 )
             if specs.validator is not None and not callable(specs.validator):
                 raise TypeError(
