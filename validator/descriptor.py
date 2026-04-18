@@ -40,13 +40,12 @@ class ValidatorDescriptor:
             return self.specs.default
 
         else:
-            raise AttributeError(f"{self.name!r} attribute value is not provided.")
+            raise AttributeError(f"{self.name!r} attribute value is not provided")
 
     def __set__(self, instance: Any, value: Any) -> None:
         if self.specs.read_only and instance in self._storage:
-            raise ValueError(f"{self.name} attribute value is only for reading.")
-        self.conform_value(value)
-        self._storage[instance] = value
+            raise ValueError(f"{self.name} attribute value is only for reading")
+        self._storage[instance] = self.conform_value(value)
 
     @classmethod
     def _type_checker(
@@ -180,7 +179,7 @@ class ValidatorDescriptor:
         if self.specs.min_value is not None or self.specs.max_value is not None:
             if not isinstance(value, Comparable):
                 raise TypeError(
-                    f"{self.name!r} attribute value must need to be comparable."
+                    f"{self.name!r} attribute value must need to be comparable"
                 )
 
             if self.specs.min_value is not None and value < self.specs.min_value:
@@ -214,7 +213,7 @@ class ValidatorDescriptor:
                     f"{self.name!r} attribute value length greater than maximum allowed {self.specs.max_length!r}"
                 )
 
-    def conform_value(self, value: Any) -> None:
+    def conform_value(self, value: Any) -> Any:
         """
         Validates value against the descriptor's annotation and Field specs.
         Raises TypeError with a full path description if validation fails.
@@ -226,3 +225,16 @@ class ValidatorDescriptor:
             raise TypeError(f"{self.name!r}: {message}")
 
         self._constraints_checker(value)
+
+        if self.specs.choices is not None and value not in self.specs.choices:
+            raise ValueError(
+                f"{self.name!r}: value {value!r} is not in allowed choices {self.specs.choices}"
+            )
+
+        if self.specs.validator is not None and not self.specs.validator(value):
+            raise ValueError(f"{self.name!r}: value {value!r} failed custom validator")
+
+        if self.specs.transformer is not None:
+            return self.specs.transformer(value)
+
+        return value

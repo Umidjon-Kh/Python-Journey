@@ -23,7 +23,8 @@ class Field:
         "min_length",
         "max_length",
         "choices",
-        "custom_func",
+        "validator",
+        "transformer",
     )
 
     def __init__(
@@ -36,7 +37,8 @@ class Field:
         min_length: Optional[int] = None,
         max_length: Optional[int] = None,
         choices: Optional[Container] = None,
-        custom_func: Callable[[Any], bool] = lambda x: x,
+        validator: Optional[Callable[[Any], bool]] = None,
+        transformer: Optional[Callable[[Any], Any]] = None,
     ) -> None:
         self.default = default
         self.deep_check = deep_check
@@ -46,4 +48,5 @@ class Field:
         self.min_length = min_length
         self.max_length = max_length
         self.choices = choices
-        self.custom_func = custom_func
+        self.validator = validator
+        self.transformer = transformer
