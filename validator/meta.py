@@ -104,6 +104,10 @@ class MetaValidator(type):
                     specs = Field(default=raw)
 
             # ── Validate Field specs at class definition time ─────────────────
+            if specs.default is not _MISSING and specs.default_factory is not None:
+                raise TypeError(
+                    f"{name!r} attribute {field_name!r}: cannot set both 'default' and 'default_factory'"
+                )
             if specs.default_factory is not None and not callable(
                 specs.default_factory
             ):
@@ -115,10 +119,6 @@ class MetaValidator(type):
             ):
                 raise TypeError(
                     f"{name!r} attribute {field_name!r}: default value must be immutable"
-                )
-            if specs.default is not _MISSING and specs.default_factory is not None:
-                raise TypeError(
-                    f"{name!r} attribute {field_name!r}: cannot set both 'default' and 'default_factory'"
                 )
             if specs.validator is not None and not callable(specs.validator):
                 raise TypeError(
