@@ -179,9 +179,7 @@ class ValidatorDescriptor:
         """
         if self.specs.min_value is not None or self.specs.max_value is not None:
             if not isinstance(value, Comparable):
-                raise TypeError(
-                    f"{self.name!r} attribute value must need to be comparable"
-                )
+                raise TypeError(f"{self.name!r} attribute value must be comparable")
 
             if self.specs.min_value is not None and value < self.specs.min_value:
                 raise ValueError(
