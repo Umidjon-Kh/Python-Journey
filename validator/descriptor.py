@@ -189,7 +189,9 @@ class ValidatorDescriptor:
 
         if self.specs.min_length is not None or self.specs.max_length is not None:
             if not hasattr(value, "__len__"):
-                raise TypeError(f"{self.name!r}: attribute value does not support len()")
+                raise TypeError(
+                    f"{self.name!r}: attribute value does not support len()"
+                )
 
             sized_value = cast(Sized, value)
 
