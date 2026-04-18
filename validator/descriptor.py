@@ -2,7 +2,8 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Tuple, Union, get_args, get_origin
 from weakref import WeakKeyDictionary
 
-from field import _MISSING, Field
+from .field import _MISSING, Field
+from .protocols import Comparable
 
 
 class ValidatorDescriptor:
@@ -140,6 +141,71 @@ class ValidatorDescriptor:
 
         return (True, "")
 
+    def _constraints_checker(self, value: Any, specs: Field) -> None:
+        """
+        Validate that the given value satisfies all value and length constraints
+        defined in the provided `Field` specification.
+
+        This method enforces:
+            - Comparability:   If `min_value` or `max_value` is set, the value must
+                               implement the `Comparable` protocol (supporting
+                               ``<``, ``<=``, ``>``, ``>=``).
+            - Numeric bounds:  `value >= specs.min_value` and
+                               `value <= specs.max_value`.
+            - Length support:  If `min_length` or `max_length` is set, the value
+                               must support the built-in `len()` function (i.e.,
+                               implement `__len__`).
+            - Length bounds:   `len(value) >= specs.min_length` and
+                               `len(value) <= specs.max_length`.
+
+        Args:
+            value:
+                The value being validated.
+            specs:
+                A `Field` instance containing the constraint parameters:
+                `min_value`, `max_value`, `min_length`, `max_length`.
+
+        Raises:
+            TypeError:
+                - If `min_value` / `max_value` are set but `value` is not comparable.
+                - If `min_length` / `max_length` are set but `value` does not
+                  support `len()`.
+            ValueError:
+                - If `value` is outside the allowed numeric bounds.
+                - If the length of `value` is outside the allowed length bounds.
+
+        Returns:
+            None: The method completes silently if all constraints are satisfied.
+        """
+        if specs.min_value is not None or specs.max_value is not None:
+            if not isinstance(value, Comparable):
+                raise TypeError(
+                    f"{self.name!r} attribute value must need to be comparable."
+                )
+
+        if specs.min_value is not None and value < specs.min_value:
+            raise ValueError(
+                f"{self.name!r} attribute value less than minimum allowed {specs.min_value}"
+            )
+        if specs.max_value is not None and value > specs.max_value:
+            raise ValueError(
+                f"{self.name!r} attribute value is greater than maximum allowed {specs.max_value!r}"
+            )
+
+        if specs.min_length is not None or specs.max_length is not None:
+            if not hasattr(value, "__len__"):
+                raise TypeError(f"{self.name!r} attribute value does not support len()")
+
+        if specs.min_length is not None and len(value) < specs.min_length:
+            raise ValueError(
+                f"{self.name!r} attribute value length less than minimum allowed {specs.min_length!r}"
+            )
+
+        if specs.max_length is not None and len(value) > specs.max_length:
+            raise ValueError(
+                f"{self.name!r} attribute value length greater than maximum allowed {specs.max_length!r}"
+            )
+
     def conform_value(self, value: Any) -> None:
         """
         Validates value against the descriptor's annotation and Field specs.
@@ -149,4 +215,4 @@ class ValidatorDescriptor:
             value, self.annotation, self.specs.deep_check
         )
         if not matched:
-            raise TypeError(f"'{self.name}': {message}")
+            raise TypeError(f"{self.name!r}: {message}")
