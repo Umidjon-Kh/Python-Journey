@@ -16,6 +16,7 @@ class Field:
 
     __slots__ = (
         "default",
+        "default_factory",
         "deep_check",
         "read_only",
         "min_value",
@@ -30,6 +31,7 @@ class Field:
     def __init__(
         self,
         default: Optional[Any] = _MISSING,
+        default_factory: Optional[Callable[[], Any]] = None,
         deep_check: bool = False,
         read_only: bool = False,
         min_value: Optional[Comparable] = None,
@@ -41,6 +43,7 @@ class Field:
         transformer: Optional[Callable[[Any], Any]] = None,
     ) -> None:
         self.default = default
+        self.default_factory = default_factory
         self.deep_check = deep_check
         self.read_only = read_only
         self.min_value = min_value

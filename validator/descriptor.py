@@ -36,9 +36,6 @@ class ValidatorDescriptor:
         elif instance in self._storage:
             return self._storage[instance]
 
-        elif self.specs.default is not _MISSING:
-            return self.specs.default
-
         else:
             raise AttributeError(f"{self.name!r} attribute value is not provided")
 

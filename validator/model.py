@@ -34,8 +34,10 @@ class Model(metaclass=MetaValidator):
         for field_name, field_info in self.__class__.__fields__.items():
             if field_name in kwargs:
                 setattr(self, field_name, kwargs[field_name])
+            elif field_info.specs.default_factory is not None:
+                setattr(self, field_name, field_info.specs.default_factory())
             elif field_info.specs.default is not _MISSING:
-                pass
+                setattr(self, field_name, field_info.specs.default)
             else:
                 raise TypeError(
                     f"{self.__class__.__name__}() missing required field: {field_name!r}"

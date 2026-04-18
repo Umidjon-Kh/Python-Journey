@@ -1,4 +1,4 @@
-from collections.abc import Container
+from collections.abc import Container, MutableMapping, MutableSequence, MutableSet
 from typing import Any, NamedTuple
 
 from .descriptor import ValidatorDescriptor
@@ -56,6 +56,16 @@ class MetaValidator(type):
                 specs = Field(default=raw)
 
             # Validate Field specs at class definition time
+            if specs.default is not _MISSING and isinstance(
+                specs.default, (MutableMapping, MutableSequence, MutableSet)
+            ):
+                raise TypeError(
+                    f"{name!r} attribute {field_name!r} default value must be immutable"
+                )
+            if specs.default is not _MISSING and specs.default_factory is not None:
+                raise TypeError(
+                    f"{name!r} attribute {field_name!r} must contain default or default_factory not both fields"
+                )
             if specs.validator is not None and not callable(specs.validator):
                 raise TypeError(
                     f"{name!r} attribute {field_name!r} validator must be callable"
