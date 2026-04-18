@@ -1,7 +1,5 @@
 from typing import Any, Callable, Container, Optional
 
-from .protocols import Comparable
-
 # Constant to mark not provided arguments
 _MISSING = object()
 
@@ -34,8 +32,8 @@ class Field:
         default_factory: Optional[Callable[[], Any]] = None,
         deep_check: bool = False,
         read_only: bool = False,
-        min_value: Optional[Comparable] = None,
-        max_value: Optional[Comparable] = None,
+        min_value: Optional[Any] = None,
+        max_value: Optional[Any] = None,
         min_length: Optional[int] = None,
         max_length: Optional[int] = None,
         choices: Optional[Container] = None,
