@@ -45,7 +45,8 @@ class ValidatorDescriptor:
     def __set__(self, instance: Any, value: Any) -> None:
         if self.specs.read_only and instance in self._storage:
             raise ValueError(f"{self.name} attribute value is only for reading")
-        self._storage[instance] = self.conform_value(value)
+        final_result = self.conform_value(value)
+        self._storage[instance] = final_result
 
     @classmethod
     def _type_checker(
