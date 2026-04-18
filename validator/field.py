@@ -33,7 +33,7 @@ class Field:
         read_only: bool = False,
         min_value: Optional[Comparable] = None,
         max_value: Optional[Comparable] = None,
-        min_lenght: Optional[int] = None,
+        min_length: Optional[int] = None,
         max_length: Optional[int] = None,
         choices: Optional[Container] = None,
         custom_func: Callable[[Any], bool] = lambda x: x,
@@ -43,7 +43,7 @@ class Field:
         self.read_only = read_only
         self.min_value = min_value
         self.max_value = max_value
-        self.min_length = min_lenght
+        self.min_length = min_length
         self.max_length = max_length
         self.choices = choices
         self.custom_func = custom_func

@@ -1,5 +1,5 @@
-from collections.abc import Mapping, Sequence
-from typing import Any, Tuple, Union, get_args, get_origin
+from collections.abc import Mapping, Sequence, Sized
+from typing import Any, Tuple, Union, cast, get_args, get_origin
 from weakref import WeakKeyDictionary
 
 from .field import _MISSING, Field
@@ -141,7 +141,7 @@ class ValidatorDescriptor:
 
         return (True, "")
 
-    def _constraints_checker(self, value: Any, specs: Field) -> None:
+    def _constraints_checker(self, value: Any) -> None:
         """
         Validate that the given value satisfies all value and length constraints
         defined in the provided `Field` specification.
@@ -177,34 +177,42 @@ class ValidatorDescriptor:
         Returns:
             None: The method completes silently if all constraints are satisfied.
         """
-        if specs.min_value is not None or specs.max_value is not None:
+        if self.specs.min_value is not None or self.specs.max_value is not None:
             if not isinstance(value, Comparable):
                 raise TypeError(
                     f"{self.name!r} attribute value must need to be comparable."
                 )
 
-        if specs.min_value is not None and value < specs.min_value:
-            raise ValueError(
-                f"{self.name!r} attribute value less than minimum allowed {specs.min_value}"
-            )
-        if specs.max_value is not None and value > specs.max_value:
-            raise ValueError(
-                f"{self.name!r} attribute value is greater than maximum allowed {specs.max_value!r}"
-            )
+            if self.specs.min_value is not None and value < self.specs.min_value:
+                raise ValueError(
+                    f"{self.name!r} attribute value less than minimum allowed {self.specs.min_value}"
+                )
+            if self.specs.max_value is not None and value > self.specs.max_value:
+                raise ValueError(
+                    f"{self.name!r} attribute value is greater than maximum allowed {self.specs.max_value!r}"
+                )
 
-        if specs.min_length is not None or specs.max_length is not None:
+        if self.specs.min_length is not None or self.specs.max_length is not None:
             if not hasattr(value, "__len__"):
                 raise TypeError(f"{self.name!r} attribute value does not support len()")
 
-        if specs.min_length is not None and len(value) < specs.min_length:
-            raise ValueError(
-                f"{self.name!r} attribute value length less than minimum allowed {specs.min_length!r}"
-            )
+            sized_value = cast(Sized, value)
 
-        if specs.max_length is not None and len(value) > specs.max_length:
-            raise ValueError(
-                f"{self.name!r} attribute value length greater than maximum allowed {specs.max_length!r}"
-            )
+            if (
+                self.specs.min_length is not None
+                and len(sized_value) < self.specs.min_length
+            ):
+                raise ValueError(
+                    f"{self.name!r} attribute value length less than minimum allowed {self.specs.min_length!r}"
+                )
+
+            if (
+                self.specs.max_length is not None
+                and len(sized_value) > self.specs.max_length
+            ):
+                raise ValueError(
+                    f"{self.name!r} attribute value length greater than maximum allowed {self.specs.max_length!r}"
+                )
 
     def conform_value(self, value: Any) -> None:
         """
@@ -216,3 +224,5 @@ class ValidatorDescriptor:
         )
         if not matched:
             raise TypeError(f"{self.name!r}: {message}")
+
+        self._constraints_checker(value)
