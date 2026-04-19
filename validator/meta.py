@@ -19,15 +19,10 @@ class MetaValidator(type):
     Metaclass that automatically wraps annotated class attributes
     into ValidatorDescriptor instances at class creation time.
 
-    Supports:
-        - Automatic descriptor injection for all annotated fields
-        - Field spec validation at class definition time (not at runtime)
-        - Inheritance — fields are collected from the full MRO
-        - Optional __slots__ generation via slots=True class argument
-        - Annotated[type, Field(...)] syntax for full type checker compatibility
+    Only Annotated[type, Field(...)] syntax is supported.
 
     Usage:
-        class User(Model, slots=True):
+        class User(Model):
             name: Annotated[str, Field(min_length=1)]
             age: Annotated[int, Field(min_value=0, max_value=150)]
             role: Annotated[str, Field(default="user")]
@@ -40,7 +35,6 @@ class MetaValidator(type):
         name: str,
         bases: tuple,
         namespace: dict,
-        slots: bool = False,
         **kwargs: Any,
     ) -> "MetaValidator":
         annotations: dict = namespace.get("__annotations__", {})
@@ -48,18 +42,15 @@ class MetaValidator(type):
         fields: dict[str, FieldInfo] = {}
 
         for field_name, annotation in annotations.items():
-            # ── Only Annotated syntax is supported ───────────────────────────
             if get_origin(annotation) is not Annotated:
                 raise TypeError(
                     f"{name!r} attribute {field_name!r}: must use "
-                    f"Annotated[type, Field(...)] syntax. "
-                    f"Example: {field_name}: Annotated[{annotation}, Field()]"
+                    f"Annotated[type, Field(...)] syntax"
                 )
 
             annotated_args = get_args(annotation)
             real_annotation = annotated_args[0]
 
-            # Cannot have multiple Field in Annotated
             field_list = [a for a in annotated_args[1:] if isinstance(a, Field)]
             if len(field_list) > 1:
                 raise TypeError(
@@ -67,9 +58,8 @@ class MetaValidator(type):
                 )
 
             specs = field_list[0] if field_list else Field()
-            annotation = real_annotation
 
-            # ── Validate Field specs at class definition time ─────────────────
+            # ── Validate Field specs ──────────────────────────────────────────
             if specs.default is not _MISSING and specs.default_factory is not None:
                 raise TypeError(
                     f"{name!r} attribute {field_name!r}: cannot set both 'default' and 'default_factory'"
@@ -84,7 +74,7 @@ class MetaValidator(type):
                 specs.default, (MutableMapping, MutableSequence, MutableSet)
             ):
                 raise TypeError(
-                    f"{name!r} attribute {field_name!r}: default value must be immutable"
+                    f"{name!r} attribute {field_name!r}: default must be immutable. Use default_factory instead"
                 )
             if specs.validator is not None and not callable(specs.validator):
                 raise TypeError(
@@ -127,24 +117,19 @@ class MetaValidator(type):
                     f"{name!r} attribute {field_name!r}: choices must be a container"
                 )
 
-            descriptor = ValidatorDescriptor(annotation, specs)
+            descriptor = ValidatorDescriptor(real_annotation, specs)
             patched[field_name] = descriptor
             fields[field_name] = FieldInfo(
-                annotation=annotation,
+                annotation=real_annotation,
                 specs=specs,
                 descriptor=descriptor,
             )
 
-        if slots:
-            patched["__slots__"] = ()
-
         cls = super().__new__(mcls, name, bases, patched, **kwargs)
 
-        # Collect inherited fields from full MRO (excluding object)
         inherited: dict[str, FieldInfo] = {}
         for base in reversed(cls.__mro__[1:]):
             inherited.update(getattr(base, "__fields__", {}))
-
         inherited.update(fields)
         cls.__fields__ = inherited
 

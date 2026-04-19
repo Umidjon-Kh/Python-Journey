@@ -1,6 +1,5 @@
 from collections.abc import Mapping, Sequence, Sized
 from typing import Any, Tuple, Union, cast, get_args, get_origin
-from weakref import WeakKeyDictionary
 
 from .field import Field
 from .protocols import Comparable
@@ -8,23 +7,17 @@ from .protocols import Comparable
 
 class ValidatorDescriptor:
     """
-    A descriptor that enforces validation rules whenever the attribute is set.
-    Each time a new value is assigned to the managed attribute, the descriptor
-    checks whether the value conforms to the predefined specifications. If the
-    value does not meet the requirements, an appropriate exception is raised.
+    A descriptor that validates and stores field values in instance.__dict__.
+
+    Stores data directly in the instance dictionary using the field name
+    as key — no WeakKeyDictionary, no recursion, no conflicts with __eq__.
     """
 
-    __slots__ = (
-        "name",
-        "annotation",
-        "specs",
-        "_storage",
-    )
+    __slots__ = ("name", "annotation", "specs")
 
     def __init__(self, annotation: type, specs: Field) -> None:
         self.annotation = annotation
         self.specs = specs
-        self._storage = WeakKeyDictionary()
 
     def __set_name__(self, owner: Any, name: str) -> None:
         self.name = name
@@ -33,15 +26,14 @@ class ValidatorDescriptor:
         if instance is None:
             return self
         try:
-            return self._storage[instance]
+            return instance.__dict__[self.name]
         except KeyError:
             raise AttributeError(f"{self.name!r}: attribute value is not provided")
 
     def __set__(self, instance: Any, value: Any) -> None:
-        if self.specs.read_only and instance in self._storage:
-            raise ValueError(f"{self.name}: attribute value is only for reading")
-        final_result = self.conform_value(value)
-        self._storage[instance] = final_result
+        if self.specs.read_only and self.name in instance.__dict__:
+            raise ValueError(f"{self.name!r}: attribute is read-only")
+        instance.__dict__[self.name] = self.conform_value(value)
 
     @classmethod
     def _type_checker(
@@ -53,7 +45,7 @@ class ValidatorDescriptor:
     ) -> Tuple[bool, str]:
         """
         Recursively validates that value matches the expected type annotation.
-        Returns (True, "") on success or (False, error_path) on first mismatch.
+        Returns (True, "") on success or (False, error_message) on mismatch.
 
         Supports:
             - Primitives:       int, str, float, bool, etc.
@@ -65,14 +57,8 @@ class ValidatorDescriptor:
         Args:
             value:      The value being validated.
             expected:   The expected type or annotation.
-            deep_check: If True, validates elements inside collections recursively.
-            _path:      Internal — tracks location for error messages.
-                        Do not pass manually.
-
-        Returns:
-            tuple[bool, str]:
-                - (True, "")           → value matches expected
-                - (False, error_path)  → mismatch with full path description
+            deep_check: If True, validates elements inside collections.
+            _path:      Internal path tracker for error messages.
         """
         if expected is Any:
             return (True, "")
@@ -99,10 +85,8 @@ class ValidatorDescriptor:
                     False,
                     f"[{_path}]: expected {origin.__name__}, got {type(value).__name__!r}",
                 )
-
             if not args or not deep_check:
                 return (True, "")
-
             if issubclass(origin, Mapping):
                 for key, val in value.items():
                     matched, message = cls._type_checker(
@@ -116,7 +100,6 @@ class ValidatorDescriptor:
                     if not matched:
                         return (False, message)
                 return (True, "")
-
             if issubclass(origin, Sequence):
                 for index, item in enumerate(value):
                     matched, message = cls._type_checker(
@@ -125,7 +108,6 @@ class ValidatorDescriptor:
                     if not matched:
                         return (False, message)
                 return (True, "")
-
             return (True, "")
 
         if not isinstance(value, expected):
@@ -133,87 +115,43 @@ class ValidatorDescriptor:
                 False,
                 f"[{_path}]: expected {expected.__name__!r}, got {type(value).__name__!r}",
             )
-
         return (True, "")
 
     def _constraints_checker(self, value: Any) -> None:
-        """
-        Validate that the given value satisfies all value and length constraints
-        defined in the provided `Field` specification.
-
-        This method enforces:
-            - Comparability:   If `min_value` or `max_value` is set, the value must
-                               implement the `Comparable` protocol (supporting
-                               ``<``, ``<=``, ``>``, ``>=``).
-            - Numeric bounds:  `value >= specs.min_value` and
-                               `value <= specs.max_value`.
-            - Length support:  If `min_length` or `max_length` is set, the value
-                               must support the built-in `len()` function (i.e.,
-                               implement `__len__`).
-            - Length bounds:   `len(value) >= specs.min_length` and
-                               `len(value) <= specs.max_length`.
-
-        Args:
-            value:
-                The value being validated.
-            specs:
-                A `Field` instance containing the constraint parameters:
-                `min_value`, `max_value`, `min_length`, `max_length`.
-
-        Raises:
-            TypeError:
-                - If `min_value` / `max_value` are set but `value` is not comparable.
-                - If `min_length` / `max_length` are set but `value` does not
-                  support `len()`.
-            ValueError:
-                - If `value` is outside the allowed numeric bounds.
-                - If the length of `value` is outside the allowed length bounds.
-
-        Returns:
-            None: The method completes silently if all constraints are satisfied.
-        """
+        """Validates value against all Field constraints."""
         if self.specs.min_value is not None or self.specs.max_value is not None:
             if not isinstance(value, Comparable):
-                raise TypeError(f"{self.name!r}: attribute value must be comparable")
-
+                raise TypeError(f"{self.name!r}: value must be comparable")
             if self.specs.min_value is not None and value < self.specs.min_value:
                 raise ValueError(
-                    f"{self.name!r}: attribute value less than minimum allowed {self.specs.min_value}"
+                    f"{self.name!r}: value is less than minimum allowed {self.specs.min_value!r}"
                 )
             if self.specs.max_value is not None and value > self.specs.max_value:
                 raise ValueError(
-                    f"{self.name!r}: attribute value is greater than maximum allowed {self.specs.max_value!r}"
+                    f"{self.name!r}: value exceeds maximum allowed {self.specs.max_value!r}"
                 )
 
         if self.specs.min_length is not None or self.specs.max_length is not None:
             if not hasattr(value, "__len__"):
-                raise TypeError(
-                    f"{self.name!r}: attribute value does not support len()"
-                )
-
+                raise TypeError(f"{self.name!r}: value does not support len()")
             sized_value = cast(Sized, value)
-
             if (
                 self.specs.min_length is not None
                 and len(sized_value) < self.specs.min_length
             ):
                 raise ValueError(
-                    f"{self.name!r}: attribute value length less than minimum allowed {self.specs.min_length!r}"
+                    f"{self.name!r}: length {len(sized_value)} is less than minimum {self.specs.min_length!r}"
                 )
-
             if (
                 self.specs.max_length is not None
                 and len(sized_value) > self.specs.max_length
             ):
                 raise ValueError(
-                    f"{self.name!r}: attribute value length greater than maximum allowed {self.specs.max_length!r}"
+                    f"{self.name!r}: length {len(sized_value)} exceeds maximum {self.specs.max_length!r}"
                 )
 
     def conform_value(self, value: Any) -> Any:
-        """
-        Validates value against the descriptor's annotation and Field specs.
-        Raises TypeError with a full path description if validation fails.
-        """
+        """Runs all validation checks and returns the final value."""
         matched, message = self._type_checker(
             value, self.annotation, self.specs.deep_check
         )
@@ -224,7 +162,7 @@ class ValidatorDescriptor:
 
         if self.specs.choices is not None and value not in self.specs.choices:
             raise ValueError(
-                f"{self.name!r}: value {value!r} is not in allowed choices {self.specs.choices}"
+                f"{self.name!r}: value {value!r} is not in allowed choices"
             )
 
         if self.specs.validator is not None and not self.specs.validator(value):

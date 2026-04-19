@@ -8,23 +8,13 @@ class Model(metaclass=MetaValidator):
     """
     Base class for all validated models.
 
-    Provides automatic field validation, type checking, and constraint
-    enforcement via MetaValidator metaclass and ValidatorDescriptor.
-
-    Features:
-        - Automatic __init__ with required field enforcement
-        - __repr__, __eq__, __hash__ out of the box
-        - to_dict() for serialization
-        - __post_init__ hook for custom post-initialization logic
-        - Optional __slots__ via slots=True class argument
-
     Usage:
-        class User(Model, slots=True):
-            name: str
-            age: int = Field(min_value=0, max_value=150)
+        class User(Model):
+            name: Annotated[str, Field(min_length=1)]
+            age: Annotated[int, Field(min_value=0, max_value=150)]
 
         user = User(name="John", age=25)
-        print(user)          # User(name='John', age=25)
+        print(user)           # User(name='John', age=25)
         print(user.to_dict()) # {"name": "John", "age": 25}
     """
 
@@ -40,7 +30,6 @@ class Model(metaclass=MetaValidator):
                 raise TypeError(
                     f"{self.__class__.__name__}() missing required field: {field_name!r}"
                 )
-
         self.__post_init__()
 
     def __repr__(self) -> str:
