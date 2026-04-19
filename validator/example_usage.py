@@ -1,17 +1,6 @@
-from typing import Annotated, Any, Callable
+from typing import Annotated
 
-from core import Field, Model
-
-
-def transfrom_to_coin(country: str) -> Callable[[Any], int]:
-    def transform(count: int) -> int:
-        if country == "Ru":
-            return count * 100
-        elif country == "USA":
-            return count * 100
-        return count
-
-    return transform
+from core import Field, Model, field_validator
 
 
 class Person(Model):
@@ -19,6 +8,12 @@ class Person(Model):
     age: Annotated[int, Field(min_value=16, max_value=30)]
     country: Annotated[str, Field(choices=["Uzb", "Ru", "USA"])]
     income: Annotated[int, Field(min_value=0)]
+
+    @field_validator("name")
+    def validate_name(cls, value: str) -> str:
+        if value.startswith(" "):
+            raise ValueError("name cannot start with space")
+        return value
 
 
 p = Person(name="Umidjon", age=18, country="Uzb", income=10000)

@@ -125,6 +125,15 @@ class MetaValidator(type):
                 descriptor=descriptor,
             )
 
+        # -------- Adding all extra field validators ----------------------
+        for key, value in namespace.items():
+            func = getattr(value, "__func__", value)
+            if hasattr(func, "__field_validator__"):
+                del patched[key]
+                for field_name in func.__field_validator__:
+                    if field_name in fields:
+                        fields[field_name].descriptor.field_validators.append(func)
+
         cls = super().__new__(mcls, name, bases, patched, **kwargs)
 
         inherited: dict[str, FieldInfo] = {}

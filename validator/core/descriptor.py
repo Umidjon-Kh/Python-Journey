@@ -13,12 +13,12 @@ class ValidatorDescriptor:
     as key — no WeakKeyDictionary, no recursion, no conflicts with __eq__.
     """
 
-    __slots__ = ("name", "annotation", "specs", "field_validator")
+    __slots__ = ("name", "annotation", "specs", "field_validators")
 
     def __init__(self, annotation: type, specs: Field) -> None:
         self.annotation = annotation
         self.specs = specs
-        self.field_validator = []
+        self.field_validators = []
 
     def __set_name__(self, owner: Any, name: str) -> None:
         self.name = name
@@ -169,7 +169,7 @@ class ValidatorDescriptor:
         if self.specs.validator is not None and not self.specs.validator(value):
             raise ValueError(f"{self.name!r}: value {value!r} failed custom validator")
 
-        for validator in self.field_validator:
+        for validator in self.field_validators:
             value = validator(type(instance), value)
 
         if self.specs.transformer is not None:
