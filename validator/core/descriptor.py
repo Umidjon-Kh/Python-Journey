@@ -13,11 +13,12 @@ class ValidatorDescriptor:
     as key — no WeakKeyDictionary, no recursion, no conflicts with __eq__.
     """
 
-    __slots__ = ("name", "annotation", "specs")
+    __slots__ = ("name", "annotation", "specs", "field_validator")
 
     def __init__(self, annotation: type, specs: Field) -> None:
         self.annotation = annotation
         self.specs = specs
+        self.field_validator = []
 
     def __set_name__(self, owner: Any, name: str) -> None:
         self.name = name
@@ -33,7 +34,7 @@ class ValidatorDescriptor:
     def __set__(self, instance: Any, value: Any) -> None:
         if self.specs.read_only and self.name in instance.__dict__:
             raise ValueError(f"{self.name!r}: attribute is read-only")
-        instance.__dict__[self.name] = self.conform_value(value)
+        instance.__dict__[self.name] = self.conform_value(value, instance)
 
     @classmethod
     def _type_checker(
@@ -150,7 +151,7 @@ class ValidatorDescriptor:
                     f"{self.name!r}: length {len(sized_value)} exceeds maximum {self.specs.max_length!r}"
                 )
 
-    def conform_value(self, value: Any) -> Any:
+    def conform_value(self, value: Any, instance: Any) -> Any:
         """Runs all validation checks and returns the final value."""
         matched, message = self._type_checker(
             value, self.annotation, self.specs.deep_check
@@ -167,6 +168,9 @@ class ValidatorDescriptor:
 
         if self.specs.validator is not None and not self.specs.validator(value):
             raise ValueError(f"{self.name!r}: value {value!r} failed custom validator")
+
+        for validator in self.field_validator:
+            value = validator(type(instance), value)
 
         if self.specs.transformer is not None:
             return self.specs.transformer(value)
