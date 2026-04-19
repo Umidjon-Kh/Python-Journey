@@ -32,11 +32,9 @@ class ValidatorDescriptor:
     def __get__(self, instance: Any, owner: object) -> Any:
         if instance is None:
             return self
-
-        elif instance in self._storage:
+        try:
             return self._storage[instance]
-
-        else:
+        except KeyError:
             raise AttributeError(f"{self.name!r}: attribute value is not provided")
 
     def __set__(self, instance: Any, value: Any) -> None:

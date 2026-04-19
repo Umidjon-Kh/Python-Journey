@@ -28,8 +28,6 @@ class Model(metaclass=MetaValidator):
         print(user.to_dict()) # {"name": "John", "age": 25}
     """
 
-    __hash__ = None  # type: ignore
-
     def __init__(self, **kwargs: Any) -> None:
         for field_name, field_info in self.__class__.__fields__.items():
             if field_name in kwargs:
@@ -57,6 +55,9 @@ class Model(metaclass=MetaValidator):
         return all(
             getattr(self, k) == getattr(other, k) for k in self.__class__.__fields__
         )
+
+    def __hash__(self) -> int:
+        return id(self)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns all fields as a plain dictionary."""
