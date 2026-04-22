@@ -17,9 +17,9 @@ class ConfigurationError(CacheError):
     """
     Raised when received params are not valid.
     Examples:
-        ttl=-1: ttl param value must be positive integer.!
-        max_size=0: max_size param value must more than zero.!
-        max_size="abc": max_size param must be positive integer.!
+        ttl=-1: ttl param value must be positive integer.
+        max_size=0: max_size param value must more than zero.
+        max_size="abc": max_size param must be positive integer.
     """
 
     ...
