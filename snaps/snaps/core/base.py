@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Hashable
-
-from typing_extensions import Optional
+from typing import Hashable, Optional
 
 from .entry import CacheEntry
 
