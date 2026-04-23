@@ -49,8 +49,7 @@ class CacheEntry:
             - Extends lifetime when sliding=True
 
         Returns:
-            Any:
-                The cached value.
+            Any: The cached value.
 
         Typical usage:
             return entry.touch()

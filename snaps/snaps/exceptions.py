@@ -34,16 +34,6 @@ class KeyGenerationError(CacheError):
     ...
 
 
-class NotFoundError(CacheError):
-    """
-    Raised when key of callable is not found in data.
-    Used when user calls get method for object than not added to cache
-    or cache is empty.
-    """
-
-    ...
-
-
 class NonCallableError(ConfigurationError):
     """
     Raised when received callable is not valid.
