@@ -43,7 +43,7 @@ class Policy(ABC):
         ...
 
     @abstractmethod
-    def om_remove(self, key: Hashable, entry: CacheEntry) -> None:
+    def on_remove(self, key: Hashable, entry: CacheEntry) -> None:
         """Hook: called before removing entry from cache."""
         ...
 
@@ -60,5 +60,14 @@ class Policy(ABC):
         """
         Checks whether an entry can be considered valid.
         Example: TTL - policy returns false, if time of life is expired.
+        """
+        ...
+
+    @abstractmethod
+    def on_clear(self) -> None:
+        """
+        Resets all internal self states.
+        Triggers when clients calls clear in orchestrator to
+        remove all entries and reset every polciy internal state.
         """
         ...
