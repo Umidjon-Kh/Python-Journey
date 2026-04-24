@@ -20,9 +20,9 @@ class CacheEntry:
     """
 
     value: Any
-    created_at: float = field(default_factory=time.monotonic)
-    last_accessed: float = field(default_factory=time.monotonic)
-    access_count: int = 0
+    created_at: float = field(default_factory=time.monotonic, init=False)
+    last_accessed: float = field(default_factory=time.monotonic, init=False)
+    access_count: int = field(default=0, init=False)
 
     def touch(self) -> Any:
         """

@@ -15,7 +15,7 @@ class TTLPolicy(Policy):
         - On absolute TTL (sliding=False) time of life is determines using created time of entry
         - On sliding TTl (sliding=True) time of life is determines using last acces to entry
         - Expired entries returns to evict_candidates for forcely removing tham from storage.
-        - For aviding race condition in multi-threading enviroment uses lock
+        - For avoiding race condition in multi-threading enviroment uses lock
     """
 
     def __init__(self, ttl: float, sliding: bool = False) -> None:
@@ -40,7 +40,7 @@ class TTLPolicy(Policy):
 
     def on_add(self, key: Hashable, entry: CacheEntry) -> None:
         """
-        Calls when adding entry to storage via orchestrator to
+        Calls when adding an entry to storage via orchestrator to
         save expiriation time of life.
         """
         with self._lock:
