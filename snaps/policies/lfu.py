@@ -11,10 +11,10 @@ class LFUPolicy(Policy):
     Tracks access frequency of entries and evicts the least frequently used ones.
 
     Particular qualities:
-        - Uses buckets (defaultdict of set) to group keys by their frequency.
-        - Uses entry.access_count as single source of truth for current frequency.
-        - Tracks min_freq to find eviction candidates without scanning all keys.
-        - Also uses thread-safe lock to avoid race condition.
+        - Uses buckets (defaultdict of set) to group keys by their frequency
+        - Uses entry.access_count as single source of truth for current frequency
+        - Tracks min_freq to find eviction candidates without scanning all keys
+        - Also uses thread-safe lock to avoid race condition
     """
 
     def __init__(self) -> None:

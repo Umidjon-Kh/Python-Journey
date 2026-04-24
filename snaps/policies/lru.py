@@ -11,9 +11,9 @@ class LRUPolicy(Policy):
     Stores order of acces to entries and evicts the most unused entries.
 
     Particular qualities:
-        - Uses OrderedDict from collections to store all keys in order of use.
+        - Uses OrderedDict from collections to store all keys in order of use
         - On acces to any entry moves it's key to end of the dict (to remember it as recently used)
-        - Also uses thread-safe lock to avoid race condition.
+        - Also uses thread-safe lock to avoid race condition
     """
 
     def __init__(self) -> None:
@@ -61,7 +61,7 @@ class LRUPolicy(Policy):
         return to_evict
 
     def is_valid(self, key: Hashable, entry: CacheEntry) -> bool:
-        """LRU dont decides key is valid or not, that's why it returns always True"""
+        """LRU dont decides key is valid or not, that's why it returns always True."""
         return True
 
     def on_clear(self) -> None:
