@@ -52,10 +52,9 @@ class LRUPolicy(Policy):
         If keys to evict is more that limit returns only limit size keys.
         """
         with self._lock:
-            count = 0
             to_evict = []
             for key in self._order.keys():
-                if count >= limit:
+                if len(to_evict) >= limit:
                     break
                 to_evict.append(key)
 

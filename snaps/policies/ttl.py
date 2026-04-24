@@ -75,13 +75,11 @@ class TTLPolicy(Policy):
         now = monotonic()
         with self._lock:
             expired = []
-            count = 0
             for key, deadline in self._expiry.items():
-                if count >= limit:
+                if len(expired) >= limit:
                     break
                 if deadline <= now:
                     expired.append(key)
-                    count += 1
 
         return expired
 
