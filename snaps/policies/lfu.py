@@ -11,60 +11,54 @@ class LFUPolicy(Policy):
     Tracks access frequency of entries and evicts the least frequently used ones.
 
     Particular qualities:
-        - Uses frequency dict to track how many times each key was accessed.
         - Uses buckets (defaultdict of set) to group keys by their frequency.
-        - Tracks min_freq to find eviction candidates in O(1).
+        - Uses entry.access_count as single source of truth for current frequency.
+        - Tracks min_freq to find eviction candidates without scanning all keys.
         - Also uses thread-safe lock to avoid race condition.
     """
 
     def __init__(self) -> None:
         """Initializes default internal stats to track frequency of keys."""
-        self._freq: dict[Hashable, int] = {}
         self._buckets: defaultdict[int, set] = defaultdict(set)
         self._min_freq: int = 0
         self._lock: Lock = Lock()
 
     def on_add(self, key: Hashable, entry: CacheEntry) -> None:
         """
-        Calls when adding entry to the storage by upper layer object (ordinary orchestrator).
-        Sets frequency of key to 1 and places it in bucket 1.
-        Always resets min_freq to 1 since new entry is the least frequent.
+        Calls when putting new or updating existing value in cache.
+        Orchestrator guarantees on_remove is called before on_add on update,
+        so this method always receives a fresh key with access_count = 1.
+        Always resets min_freq to 1 since added entry is the least frequent.
         """
         with self._lock:
-            self._freq[key] = 1
-            self._buckets[1].add(key)
-            self._min_freq = 1
+            self._buckets[entry.access_count].add(key)
+            self._min_freq = entry.access_count  # always 1
 
     def on_access(self, key: Hashable, entry: CacheEntry) -> None:
         """
-        Calls when orchestrator gained access to an existing key.
-        Moves key from current frequency bucket to the next one.
-        Updates min_freq if current bucket becomes empty after moving.
+        Calls after getting access to entry (entry.touch() already completed).
+        old bucket = access_count - 1, new bucket = access_count.
+        Updates min_freq if old bucket becomes empty after moving.
         """
         with self._lock:
-            if key not in self._freq:
-                return
+            old_freq = entry.access_count - 1
+            new_freq = entry.access_count
 
-            freq = self._freq[key]
-            self._freq[key] = freq + 1
+            self._buckets[old_freq].discard(key)
+            if not self._buckets[old_freq]:
+                del self._buckets[old_freq]
+                if self._min_freq == old_freq:
+                    self._min_freq = new_freq
 
-            self._buckets[freq].discard(key)
-            if not self._buckets[freq]:
-                del self._buckets[freq]
-                if self._min_freq == freq:
-                    self._min_freq = freq + 1
-
-            self._buckets[freq + 1].add(key)
+            self._buckets[new_freq].add(key)
 
     def on_remove(self, key: Hashable, entry: CacheEntry) -> None:
         """
-        Calls before removing entry from storage.
-        Removes key from frequency dict and its bucket.
+        Calls before removing entry from cache.
+        Uses entry.access_count to find the right bucket directly.
         """
         with self._lock:
-            freq = self._freq.pop(key, None)
-            if freq is None:
-                return
+            freq = entry.access_count
             self._buckets[freq].discard(key)
             if not self._buckets[freq]:
                 del self._buckets[freq]
@@ -72,16 +66,17 @@ class LFUPolicy(Policy):
     def evict_candidates(self, limit: int) -> Sequence[Hashable]:
         """
         Returns sequence of least frequently used keys to evict.
-        Starts from min_freq bucket and moves to higher frequencies if needed.
-        If total candidates are less than limit returns all available.
+        Walks from min_freq upward until limit is reached.
         """
         with self._lock:
             to_evict = []
-            for freq in sorted(self._buckets.keys()):
+            freq = self._min_freq
+            while len(to_evict) < limit and freq in self._buckets:
                 for key in self._buckets[freq]:
                     if len(to_evict) >= limit:
-                        return to_evict
+                        break
                     to_evict.append(key)
+                freq += 1
         return to_evict
 
     def is_valid(self, key: Hashable, entry: CacheEntry) -> bool:
@@ -89,11 +84,7 @@ class LFUPolicy(Policy):
         return True
 
     def on_clear(self) -> None:
-        """
-        Resets all internal stats to default (empty).
-        Calls when clearing a whole storage in cache.
-        """
+        """Resets all internal stats to default. Calls when clearing storage."""
         with self._lock:
-            self._freq.clear()
             self._buckets.clear()
             self._min_freq = 0
