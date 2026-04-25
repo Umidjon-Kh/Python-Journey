@@ -18,6 +18,8 @@ class TTLPolicy(Policy):
         - For avoiding race condition in multi-threading enviroment uses lock
     """
 
+    requires_max_size: bool = False
+
     def __init__(self, ttl: float, sliding: bool = False) -> None:
         """
         Initializes params when creating an instance.

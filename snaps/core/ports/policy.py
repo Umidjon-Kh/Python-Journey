@@ -30,6 +30,8 @@ class Policy(ABC):
             (OrderedDict for LRU, counters for LFU, expiry dict for TTL and etc...)
     """
 
+    requires_max_size: bool = True
+
     @abstractmethod
     def on_access(self, key: Hashable, entry: CacheEntry) -> None:
         """
