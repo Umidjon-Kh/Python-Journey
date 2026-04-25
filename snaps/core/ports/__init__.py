@@ -1,5 +1,5 @@
 from .metrics import MetricsCollector
-from .orchestrator import Orchestrator
+from .orchestrator import NOT_FOUND, Orchestrator
 from .policy import Policy
 from .storage import Storage
 
@@ -8,4 +8,5 @@ __all__ = [
     "Policy",
     "Orchestrator",
     "Storage",
+    "NOT_FOUND",
 ]

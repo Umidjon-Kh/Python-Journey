@@ -3,16 +3,13 @@ from threading import Lock
 from typing import Any, Optional
 
 from ..core import (
+    NOT_FOUND,
     CacheEntry,
     MetricsCollector,
     Orchestrator,
     Policy,
     Storage,
 )
-
-# Created to avoid confusing a not found object with
-# a NoneType object value of entries
-NOT_FOUND = object()
 
 
 class SimpleOrchestrator(Orchestrator):

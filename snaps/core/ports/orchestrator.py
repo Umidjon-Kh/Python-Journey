@@ -2,6 +2,10 @@ from abc import ABC, abstractmethod
 from collections.abc import Hashable, Mapping
 from typing import Any, Optional
 
+# Created to avoid confusing a not found object with
+# a NoneType object value of entries
+NOT_FOUND = object()
+
 
 class Orchestrator(ABC):
     """

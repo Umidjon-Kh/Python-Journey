@@ -1,5 +1,6 @@
 from .entry import CacheEntry
 from .ports import (
+    NOT_FOUND,
     MetricsCollector,
     Orchestrator,
     Policy,
@@ -12,4 +13,5 @@ __all__ = [
     "Policy",
     "Orchestrator",
     "CacheEntry",
+    "NOT_FOUND",
 ]
