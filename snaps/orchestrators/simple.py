@@ -59,7 +59,7 @@ class SimpleOrchestrator(Orchestrator):
         """
         Removes entry from storage and notifies policy about that if policy is not None.
         Calls only inside locker (thread-safety).
-        Needs only for public methods to DRY (Do no Repeat Yourself)
+        Needs only for public methods to DRY (Do no Repeat Yourself).
         """
         self._storage.delete(key)
 
@@ -78,7 +78,7 @@ class SimpleOrchestrator(Orchestrator):
             2. While size is bigger that max_size:
                 - requests policy for evicting candidates (until raises evictions limit)
                 - if policy returns empty sequence - breaks (safety)
-                - removes received key froms storage
+                - removes received keys from storage
                 - increases evictions counter in metrics
         """
         if self._policy is None:
@@ -100,7 +100,7 @@ class SimpleOrchestrator(Orchestrator):
     def get(self, key: Hashable) -> Optional[Any]:
         """
         Returns value of entry under the provided key, if it exists, otherwise
-        returns _NOT_FOUND object to avoid confusing NoneType object with not founded.
+        returns NOT_FOUND object to avoid confusing NoneType object with not founded.
 
         How it works:
             1. Locker blocks acces to other threads (thread-safety).
@@ -175,7 +175,7 @@ class SimpleOrchestrator(Orchestrator):
         """
         with self._lock:
             self._storage.clear()
-            if self._policy:
+            if self._policy is not None:
                 self._policy.on_clear()
             self._metrics.reset()
 
