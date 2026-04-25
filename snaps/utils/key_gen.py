@@ -45,7 +45,7 @@ def generate_auto_key(
         bound = sig.bind(*args, **kwargs)
         bound.apply_defaults()
         args_repr = repr(tuple(bound.arguments.items()))
-        return f"{func.__module__}.{func.__name__}:{args_repr}"
+        return f"{func.__module__}.{func.__qualname__}:{args_repr}"
     except TypeError as exc:
         raise KeyGenerationError(
             "Failed to generate cache key from function arguments."

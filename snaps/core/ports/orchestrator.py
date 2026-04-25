@@ -35,7 +35,7 @@ class Orchestrator(ABC):
         If key exists and its valid:
             - updates entry metadata
             - increases hits counter value
-            - notifies policies by calling policy.on_acces hook
+            - notifies policies by calling policy.on_access hook
             - returns value of entry
         """
         ...
