@@ -29,7 +29,7 @@ class Orchestrator(ABC):
 
         If key does not exist:
             - increases missed counter value
-            - returns None
+            - returns NOT_FOUND
 
         If key exists but policies consider it invalid:
             - increases missed counter value
@@ -53,7 +53,6 @@ class Orchestrator(ABC):
             - creates new entry with received value
             - rewrites to storage under received key
             - notifies policies by calling policy.on_add hook
-            - not calls evict_candidates cuase size is not increases
 
         If key is not exist:
             - creates new entry with received value

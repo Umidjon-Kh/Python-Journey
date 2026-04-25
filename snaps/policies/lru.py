@@ -61,7 +61,7 @@ class LRUPolicy(Policy):
         return to_evict
 
     def is_valid(self, key: Hashable, entry: CacheEntry) -> bool:
-        """LRU dont decides key is valid or not, that's why it returns always True."""
+        """LRU does not decides key is valid or not, that's why it returns always True."""
         return True
 
     def on_clear(self) -> None:
