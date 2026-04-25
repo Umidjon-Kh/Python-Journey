@@ -136,7 +136,7 @@ def snap(
     # ----- Wrapping callable ----------
     def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(*args: tuple, **kwds: dict) -> Any:
+        def wrapper(*args: Any, **kwds: Any) -> Any:
             # generation of key to cache storage
             if key is not None:
                 cache_key = generate_template_key(key, func, args, kwds)
@@ -151,8 +151,8 @@ def snap(
             return result
 
         # Adding clear and stats method to wrapper
-        wrapper.clear = orchestrator.clear
-        wrapper.stats = orchestrator.stats
+        setattr(wrapper, "clear", orchestrator.clear)
+        setattr(wrapper, "stats", orchestrator.stats)
 
         return wrapper
 
@@ -184,9 +184,9 @@ def def_policies_checker(
             raise ConfigurationError(
                 f"TTLPolicy first argument must be integer not {type(ttl[0]).__name__!r}."
             )
-        if isinstance(ttl[1], int) or not isinstance(ttl[1], bool):
+        if not isinstance(ttl[1], bool):
             raise ConfigurationError(
-                f"TTPolicy second argument 'sliding; must be boolean got {type(ttl[1]).__name__!r}"  # type: ignore[union-attr]
+                f"TTPolicy second argument 'sliding' must be boolean got {type(ttl[1]).__name__!r}"  # type: ignore[union-attr]
             )
 
         policies.append(TTLPolicy(ttl=ttl[0], sliding=ttl[1]))
@@ -223,9 +223,9 @@ def def_policies_checker(
                 f"Argument 'evictions_limit' must be positive integer got {type(evictions_limit).__name__!r}."
             )
 
-        if max_size <= 0:
+        if evictions_limit <= 0:
             raise ConfigurationError(
-                f"Argument 'max_size' must be positive integer got {max_size}."
+                f"Argument 'evictions_limit' must be positive integer got {evictions_limit}."
             )
 
     return policies
