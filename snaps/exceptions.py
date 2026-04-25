@@ -14,3 +14,9 @@ class ConfigurationError(CacherError):
     """Raised when provided configs in dependecny injection is invalid."""
 
     ...
+
+
+class KeyGenerationError(CacherError):
+    """Raised when cant generate key for entry from provided arguments."""
+
+    ...
