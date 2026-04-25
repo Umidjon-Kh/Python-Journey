@@ -10,7 +10,7 @@ from ..exceptions import KeyGenerationError
 def generate_auto_key(
     func: Callable[..., Any],
     args: tuple[Any, ...],
-    kwargs: dict[str, Any],
+    kwds: dict[str, Any],
 ) -> str:
     """
     Generates a deterministic cache key from function signature.
@@ -42,7 +42,7 @@ def generate_auto_key(
     """
     try:
         sig = inspect.signature(func)
-        bound = sig.bind(*args, **kwargs)
+        bound = sig.bind(*args, **kwds)
         bound.apply_defaults()
         args_repr = repr(tuple(bound.arguments.items()))
         return f"{func.__module__}.{func.__qualname__}:{args_repr}"
@@ -56,7 +56,7 @@ def generate_template_key(
     template: str,
     func: Callable[..., Any],
     args: tuple[Any, ...],
-    kwargs: dict[str, Any],
+    kwds: dict[str, Any],
 ) -> str:
     """
     Generates a cache key from a user-provided template string.
@@ -85,7 +85,7 @@ def generate_template_key(
     """
     try:
         sig = inspect.signature(func)
-        bound = sig.bind(*args, **kwargs)
+        bound = sig.bind(*args, **kwds)
         bound.apply_defaults()
         return template.format(**bound.arguments)
     except (TypeError, KeyError) as exc:

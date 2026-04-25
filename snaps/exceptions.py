@@ -10,13 +10,19 @@ class CacherError(Exception):
     ...
 
 
+class KeyGenerationError(CacherError):
+    """Raised when cant generate key for entry from provided arguments."""
+
+    ...
+
+
 class ConfigurationError(CacherError):
     """Raised when provided configs in dependecny injection is invalid."""
 
     ...
 
 
-class KeyGenerationError(CacherError):
-    """Raised when cant generate key for entry from provided arguments."""
+class InvalidPolicyError(ConfigurationError):
+    """Raised when provided custom policy is invalid."""
 
     ...
