@@ -18,33 +18,37 @@ NOT_FOUND = object()
 class SimpleOrchestrator(Orchestrator):
     """
     Realization of simple orchestrator that manages with a cache storage and
-    only with a sinlge policy, uses when needed simlpied and lighetr version of cacher.
+    only with a sinlge policy if it was provided, otherwise only stores a cache.
+    Uses when needed simplified and lighter version of cacher.
 
     SimpleOrchestrator is responsible for:
         - storage of data (Storage)
-        - application of policy (Policy)
+        - application of policy if its not None (Policy)
         - collecting metrics (MetricsCollector)
-        - thread0safety (Lock)
+        - thread-safety (Lock)
         - cache size control (max_size)
         - limit of evictions when cache is raised max size (eviction limit)
 
     Logic of work procces:
-        - get: checks for contains -> validity -> updates metadata -> notifies policy
-        - put: adds/updates entry -> calls eviction when raised max size
-        - delete/clear: removing and notifying policy
+        - get: checks for contains -> validity (if policy is provided) -> updates metadata -> notifies policy
+        - put: adds/updates entry -> calls eviction when raised max size (only if policy and max_size is provided)
+        - delete/clear: removing and notifying policy (only if it was provided)
         - stats: returns stats of metrics and storage
+
+    Notes:
+        - If you want to use policy or max size ou need to provide both of them.
     """
 
     def __init__(
         self,
-        policy: Policy,
+        policy: Optional[Policy],
         storage: Storage,
         metrics: MetricsCollector,
         max_size: int,
         eviction_limit: int,
     ) -> None:
         """Initializes orchestrator all dependency attribute objects."""
-        self._policy: Policy = policy
+        self._policy: Optional[Policy] = policy
         self._storage: Storage = storage
         self._metrics: MetricsCollector = metrics
         self._max_size: int = max_size
@@ -53,16 +57,19 @@ class SimpleOrchestrator(Orchestrator):
 
     def _force_remove(self, key: Hashable, entry: CacheEntry) -> None:
         """
-        Removes entry from storage and notifies policy about that.
+        Removes entry from storage and notifies policy about that if policy is not None.
         Calls only inside locker (thread-safety).
         Needs only for public methods to DRY (Do no Repeat Yourself)
         """
         self._storage.delete(key)
-        self._policy.on_remove(key, entry)
+
+        if self._policy is not None:
+            self._policy.on_remove(key, entry)
 
     def _enforce_size_limit(self) -> None:
         """
         Evicts entries if size of storage raised max_size.
+        If policy is not provived silently ignores and does nothing.
 
         Steps:
             1. If max_size is not provided, does nothing
@@ -74,6 +81,9 @@ class SimpleOrchestrator(Orchestrator):
                 - removes received key froms storage
                 - increases evictions counter in metrics
         """
+        if self._policy is None:
+            return
+
         while self._storage.size() > self._max_size:
             candidates = self._policy.evict_candidates(limit=self._eviction_limit)
             if not candidates:
@@ -96,11 +106,11 @@ class SimpleOrchestrator(Orchestrator):
             1. Locker blocks acces to other threads (thread-safety).
             2. Getts entry from storage.
             3. If entry is not found in storage, increases misses count and return NOT_FOUND.
-            4. If entry is founded but policy decides this entry is not valid removes it and
+            4. If entry is founded but policy (if it was provided) decides this entry is not valid removes it and
                                     increases misses count after returns NOT_FOUND.
             5. If entry is exists and it's valid:
                 - updates metadata of entry (entry.touch())
-                - notifies policy (policy.on_acces())
+                - notifies policy only if it was provided (policy.on_acces())
                 - increases hits count in metrics
                 - returns value of entry
         """
@@ -110,14 +120,17 @@ class SimpleOrchestrator(Orchestrator):
                 self._metrics.miss(key)
                 return NOT_FOUND
 
-            if not self._policy.is_valid(key, entry):
+            if self._policy is not None and not self._policy.is_valid(key, entry):
                 self._force_remove(key, entry)
                 self._metrics.miss(key)
                 self._metrics.evict(key)
                 return NOT_FOUND
 
             entry.touch()
-            self._policy.on_access(key, entry)
+
+            if self._policy is not None:
+                self._policy.on_access(key, entry)
+
             self._metrics.hit(key)
 
         return entry.value
@@ -131,7 +144,7 @@ class SimpleOrchestrator(Orchestrator):
             2. If key is exists in storage, removes it and notifies policy.
             3. Wraps value into an entry object.
             4. Stores it to the storage.
-            5. Notifies policy (on_add)
+            5. Notifies policy (on_add) only if it was provided.
             6. Checks storage raised max size or not.
         """
         with self._lock:
@@ -142,11 +155,14 @@ class SimpleOrchestrator(Orchestrator):
             entry = CacheEntry(value=value)
 
             self._storage.put(key, entry)
-            self._policy.on_add(key, entry)
+
+            if self._policy is not None:
+                self._policy.on_add(key, entry)
+
             self._enforce_size_limit()
 
     def delete(self, key: Hashable) -> None:
-        """Removes entry from storage and notifies policy."""
+        """Removes entry from storage and notifies policy (only if it was provided)."""
         with self._lock:
             entry = self._storage.get(key)
             if entry is not None:
@@ -159,7 +175,8 @@ class SimpleOrchestrator(Orchestrator):
         """
         with self._lock:
             self._storage.clear()
-            self._policy.on_clear()
+            if self._policy:
+                self._policy.on_clear()
             self._metrics.reset()
 
     def stats(self) -> Mapping:
