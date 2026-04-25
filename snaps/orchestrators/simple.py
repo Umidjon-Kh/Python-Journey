@@ -41,15 +41,15 @@ class SimpleOrchestrator(Orchestrator):
         policy: Optional[Policy],
         storage: Storage,
         metrics: MetricsCollector,
-        max_size: int,
-        eviction_limit: int,
+        max_size: Optional[int],
+        eviction_limit: Optional[int],
     ) -> None:
         """Initializes orchestrator all dependency attribute objects."""
         self._policy: Optional[Policy] = policy
         self._storage: Storage = storage
         self._metrics: MetricsCollector = metrics
-        self._max_size: int = max_size
-        self._eviction_limit: int = eviction_limit
+        self._max_size: Optional[int] = max_size
+        self._eviction_limit: Optional[int] = eviction_limit
         self._lock: Lock = Lock()
 
     def _force_remove(self, key: Hashable, entry: CacheEntry) -> None:
@@ -66,19 +66,22 @@ class SimpleOrchestrator(Orchestrator):
     def _enforce_size_limit(self) -> None:
         """
         Evicts entries if size of storage raised max_size.
-        If policy is not provived silently ignores and does nothing.
+        If policy or max_size or evictions_limit is not
+        provived silently ignores and does nothing. Cause both three objects
+        depends each other to work properly.
 
         Steps:
-            1. If max_size is not provided, does nothing
-                    (if not provided by default it would be
-                       infinity number that was received from upper layer objects).
-            2. While size is bigger that max_size:
+            While size is bigger that max_size:
                 - requests policy for evicting candidates (until raises evictions limit)
                 - if policy returns empty sequence - breaks (safety)
                 - removes received keys from storage
                 - increases evictions counter in metrics
         """
-        if self._policy is None:
+        if (
+            self._policy is None
+            or self._max_size is None
+            or self._eviction_limit is None
+        ):
             return
 
         while self._storage.size() > self._max_size:

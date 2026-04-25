@@ -29,15 +29,15 @@ class CompositeOrchestrator(Orchestrator):
         policies: Optional[Sequence[Policy]],
         storage: Storage,
         metrics: MetricsCollector,
-        max_size: int,
-        eviction_limit: int,
+        max_size: Optional[int],
+        eviction_limit: Optional[int],
     ) -> None:
         """Initializes orchestrator all dependency attribute objects."""
         self._policies: Optional[Sequence[Policy]] = policies
         self._storage: Storage = storage
         self._metrics: MetricsCollector = metrics
-        self._max_size: int = max_size
-        self._eviction_limit: int = eviction_limit
+        self._max_size: Optional[int] = max_size
+        self._eviction_limit: Optional[int] = eviction_limit
         self._lock: Lock = Lock()
 
     def _force_remove(self, key: Hashable, entry: CacheEntry) -> None:
@@ -56,16 +56,22 @@ class CompositeOrchestrator(Orchestrator):
         """
         Evicts entries if size of storage raised max_size.
         Works only if at least was provided one policy and max_size.
+        If policy or max_size or evictions_limit is not
+        provived silently ignores and does nothing. Cause both three objects
+        depends each other to work properly.
 
         Steps:
-            1. if max_size and at least one policy is not provided -> does nothing.
-            2. else:
-                   - requests all policies for evicting candidates (until raises evictions limit)
-                   - if policies returns empty sequence - breaks (infinity loop safety)
-                   - removes received keys from storage
-                   - increases evictions counter in metrics for al of them
+            While storage size is bigger that max_size:
+               - requests all policies for evicting candidates (until raises evictions limit)
+               - if policies returns empty sequence - breaks (infinity loop safety)
+               - removes received keys from storage
+               - increases evictions counter in metrics for al of them
         """
-        if self._policies is None:
+        if (
+            self._policies is None
+            or self._max_size is None
+            or self._eviction_limit is None
+        ):
             return
 
         while self._storage.size() > self._max_size:
