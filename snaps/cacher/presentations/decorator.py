@@ -27,7 +27,7 @@ def snap(
     key: Optional[Any] = None,
     # Custom policies and default policies cfg
     policies: Optional[Sequence[Any]] = None,
-    ttl: Optional[tuple[int, bool]] = None,
+    ttl: Optional[tuple[float, bool]] = None,
     lru: Optional[bool] = None,
     lfu: Optional[bool] = None,
     # Custom storage to use
@@ -160,7 +160,7 @@ def snap(
 
 
 def def_policies_checker(
-    ttl: Optional[tuple[int, bool]],
+    ttl: Optional[tuple[float, bool]],
     lru: Optional[bool],
     lfu: Optional[bool],
     max_size: Optional[Any],
@@ -180,7 +180,7 @@ def def_policies_checker(
     policies = []
 
     if ttl is not None:
-        if not isinstance(ttl[0], int):
+        if not isinstance(ttl[0], float):
             raise ConfigurationError(
                 f"TTLPolicy first argument must be integer not {type(ttl[0]).__name__!r}."
             )
