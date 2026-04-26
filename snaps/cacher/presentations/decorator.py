@@ -1,6 +1,6 @@
 from collections.abc import Callable, Sequence
 from functools import wraps
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from ..core import (
     NOT_FOUND,
@@ -14,6 +14,7 @@ from ..orchestrators import CompositeOrchestrator, SimpleOrchestrator
 from ..policies import LFUPolicy, LRUPolicy, TTLPolicy
 from ..storages import InMemoryStorage
 from ..utils import (
+    SnapFunction,
     check_policy_requirements,
     generate_auto_key,
     generate_template_key,
@@ -134,7 +135,7 @@ def snap(
         )
 
     # ----- Wrapping callable ----------
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable) -> SnapFunction:
         @wraps(func)
         def wrapper(*args: Any, **kwds: Any) -> Any:
             # generation of key to cache storage
@@ -154,7 +155,7 @@ def snap(
         setattr(wrapper, "clear", orchestrator.clear)
         setattr(wrapper, "stats", orchestrator.stats)
 
-        return wrapper
+        return cast(SnapFunction, wrapper)
 
     return decorator
 

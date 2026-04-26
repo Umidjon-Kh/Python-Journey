@@ -1,6 +1,6 @@
 [project]
 name = "snaps-cacher"
-version = "0.1.0"
+version = "0.1.1"
 description = "Lightweight, extensible Python caching library built on hexagonal architecture. Use built-in TTL, LRU, LFU policies or plug in your own — custom policies, storages, and metrics collectors supported out of the box. Zero dependencies."
 authors = [
     {name = "Umidjon Khodjaev", email = "iexistedonlyforyou@gmail.com"}

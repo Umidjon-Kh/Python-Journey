@@ -4,9 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-27
+
 ### Added
 
-- Protocol for wrapped functions to fix Pyright warnings on `.stats()` and `.clear()` methods
+- `SnapFunction` Protocol for wrapped functions — fixes Pyright warnings on `.stats()` and `.clear()` methods
+- `cast` to properly type the return value of `@snap` decorator
 
 ## [0.1.0] - 2026-04-27
 
