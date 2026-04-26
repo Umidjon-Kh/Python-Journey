@@ -1,4 +1,5 @@
 from .core import (
+    CacheEntry,
     MetricsCollector,
     Orchestrator,
     Policy,
@@ -11,5 +12,6 @@ __all__ = [
     "Orchestrator",
     "Policy",
     "Storage",
+    "CacheEntry",
     "snap",
 ]

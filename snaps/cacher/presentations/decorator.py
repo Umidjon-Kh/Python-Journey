@@ -186,7 +186,7 @@ def def_policies_checker(
             )
         if not isinstance(ttl[1], bool):
             raise ConfigurationError(
-                f"TTPolicy second argument 'sliding' must be boolean got {type(ttl[1]).__name__!r}"  # type: ignore[union-attr]
+                f"TTLPolicy second argument 'sliding' must be boolean got {type(ttl[1]).__name__!r}"  # type: ignore[union-attr]
             )
 
         policies.append(TTLPolicy(ttl=ttl[0], sliding=ttl[1]))
