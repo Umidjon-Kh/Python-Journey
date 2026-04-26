@@ -180,7 +180,7 @@ def def_policies_checker(
     policies = []
 
     if ttl is not None:
-        if not isinstance(ttl[0], float):
+        if not isinstance(ttl[0], (float, int)):
             raise ConfigurationError(
                 f"TTLPolicy first argument must be integer not {type(ttl[0]).__name__!r}."
             )
