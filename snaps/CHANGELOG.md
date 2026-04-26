@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Protocol for wrapped functions to fix Pyright warnings on `.stats()` and `.clear()` methods
+
 ## [0.1.0] - 2026-04-27
 
 ### Added
