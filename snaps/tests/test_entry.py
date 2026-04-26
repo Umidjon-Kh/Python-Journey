@@ -2,7 +2,6 @@
 
 import time
 
-import pytest
 from cacher.core import CacheEntry
 
 
