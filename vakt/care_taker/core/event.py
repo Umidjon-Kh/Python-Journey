@@ -18,7 +18,7 @@ class EventType(StrEnum):
             - snapshots: to save a description of when this snapshot is created.
 
     Notes:
-        - EventType is a StrEnum that defunes the minimal, cross-pratfrom abstraction
+        - EventType is a StrEnum that defines the minimal, cross-pratfrom abstraction
             of file system events. It includes only those event categories that can be reliably
             observed accross different operating systems and file systems implementations.
         - This abstraction is intentionally conservative: it excludes platfrom-specific or
