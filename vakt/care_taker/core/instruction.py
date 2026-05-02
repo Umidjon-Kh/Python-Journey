@@ -83,7 +83,19 @@ class Instruction:
         - If you use Custom Event Type you need to provide it inherited from EventType and
             add handlers that supports that custom event type.
         - rollback_target attribute value must be Hashable format object
-            that points to the snapshot in the snapshots_storage
+            that points to the snapshot in the snapshots_storage.
+        - In paths glob patterns field if you want to apply instruction to all
+            objects in directory path you need to put "/*" in the end of directory name.
+            If you want to apply instruction to all objects recursively use "/**".
+
+    Example:
+        event_types:     Sequence[FILE_WRITE, DIR_RENAME]
+        paths:           Sequence["/etc/passwd", "/user/local/*"]
+        level:           LevelType.SUSPICIOUS
+        should_log:      True
+        should_backup:   True
+        should_notify:   True
+        rollback_target: "2026.10.06" or anything else like: "default_snap"
     """
 
     event_types: Optional[Sequence[EventType]] = None
