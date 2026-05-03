@@ -15,7 +15,7 @@ class EventType(StrEnum):
         In main objects:
             - watcher: to compare the observers's flag or mask with event type.
         In handlers:
-            - logger: to show the event that happaned in str not in confusing int.
+            - logger: to show the event that happened in str not in confusing int.
             - notifier: to match event type with notifier condition that creates notify.
             - snapshots: to save a description of when this snapshot is created.
 
@@ -23,17 +23,17 @@ class EventType(StrEnum):
         - EventType is a StrEnum that defines the minimal, cross-platfrom abstraction
             of file system events. It includes only those event categories that can be reliably
             observed accross different operating systems and file systems implementations.
-        - This abstracttion is intentionally conservative: it excludes platfrom-specifics or
+        - This abstraction is intentionally conservative: it excludes platfrom-specifics or
             inconsistently supported events (such as open, acces, or certain metadata changes)
             in order to provide a stable and portable contract for consumers.
         - For use cases that require higher fidelity or platfrom-specific semantics.
             EventType is designed to be extended. Custom enumerations for example:
             LinuxEventType, WindowsEventType - may introduce additional event
-            categories aligned with the capabilites of underlying platform.
+            categories aligned with the capabilities of underlying platform.
         - Such extensions are not automatically supported by the core processing
             pipeline. Consumers introducing custom event types are responsible for providing
             compatible processing components - such as specialized notifiers, dispatchers,
-            or handlers - that expilicty recognize and handle those extended semantics.
+            or handlers - that expilicitly recognize and handle those extended semantics.
 
         In other words, extending the event model requires corresponding extensions in
         the event handling layer to ensure correct propagation and interpretation of
@@ -63,13 +63,13 @@ class Event:
     represent a single changes in the file system.
 
     Attributes:
-        - path: absolute path of changed file or directory.
-        - event_type: what kind of change occured.
-        - timestamp: monotic timestamp captured by the watcher at
-                     the moment of kernel delivered the event.
+        - path:       absolute path of changed file or directory.
+        - event_type: what kind of change occurred.
+        - timestamp:  monotonic timestamp captured by the watcher at
+                      the moment of kernel delivered the event.
     Notes:
         - it is immutable because the event describes an event that
-            has already occured in the file system.
+            has already occurred in the file system.
     """
 
     path: str
