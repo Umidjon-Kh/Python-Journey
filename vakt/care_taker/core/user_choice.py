@@ -8,7 +8,7 @@ class UserChoice(StrEnum):
     Domain-level object that represents a user-defined
     response to a file system event.
 
-    This enum is used to cmmunicate user's decisions from interacion or
+    This enum is used to communicate user's decisions from interacion or
     decision-making components (handlers) back to higher-level objects
     that waits for it (e.g., dispatcher, recovery, or backup objects).
 
