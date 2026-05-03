@@ -63,13 +63,13 @@ class Instruction:
     in the pipe line.
 
     Attributes:
-        - event_type: Collection of EventType values this instruction applies to.
-                        An incoming event matches if its type is in this application.
-        - paths:      Glob Patterns of file system paths the instrcution applies to.
-        - level:      Semantic classification of the event path.
-                        Used by handlers to decide how to present or react to the event.
+        - event_type:    Collection of EventType values this instruction applies to.
+                            An incoming event matches if its type is in this application.
+        - paths:         Glob Patterns of file system paths the instrcution applies to.
+        - level:         Semantic classification of the event path.
+                            Used by handlers to decide how to present or react to the event.
         - should_notify: Whether the user should be notified via Notifier (default=False)
-        - should_log: Whether the matched event should be recorded by the Logger (default=True)
+        - should_log:    Whether the matched event should be recorded by the Logger (default=True)
         - should_backup: Whether a Snapshot should be created by the Backuper (default=False)
 
     Notes:
