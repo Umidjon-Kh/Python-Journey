@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Hashable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Optional
@@ -71,8 +71,6 @@ class Instruction:
         - should_log:    Whether the matched event should be recorded by the Logger (default=True).
         - should_backup: Whether a Snapshot should be created by the Backuper (default=False).
         - should_notify: Whether the user should be notified via a Notifier (default=False).
-        - rollback_target: Optional reference to a specific Snapshot to roll back to (default=None).
-                            Notifier will offer the user avialable options.
 
     Notes:
         - Instruction is frozen because behavioral contracts must not change at runtime.
@@ -82,8 +80,6 @@ class Instruction:
             (e.g. priority, first-match) is the responsibility of InstructionManager.
         - If you use Custom Event Type you need to provide it inherited from EventType and
             add handlers that supports that custom event type.
-        - rollback_target attribute value must be Hashable format object
-            that points to the snapshot in the snapshots_storage.
         - In paths glob patterns field if you want to apply instruction to all
             objects in directory path you need to put "/*" in the end of directory name.
             If you want to apply instruction to all objects recursively use "/**".
@@ -95,7 +91,6 @@ class Instruction:
         should_log:      True
         should_backup:   True
         should_notify:   True
-        rollback_target: "2026.10.06" or anything else like: "default_snap"
     """
 
     event_types: Optional[Sequence[EventType]] = None
@@ -104,4 +99,3 @@ class Instruction:
     should_log: bool = True
     should_backup: bool = False
     should_notify: bool = False
-    rollback_target: Optional[Hashable] = None
