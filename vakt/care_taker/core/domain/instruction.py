@@ -49,7 +49,7 @@ class Instruction:
     An Immutable, dispatcher-layer object that represents a pre-defined
     behavioral contract for specific class of o file system events.
 
-    An instruction is not created in response to a single event -
+    An instruction is not creates in response to a single event -
     it is defined in advance by the user or system configuration,
     and describes what actions should be taken when a matching event occurs.
 

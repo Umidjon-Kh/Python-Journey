@@ -12,7 +12,7 @@ class Snapshot:
     An Immutable domain-layer object representing a single backup of
     a file system object.
 
-    A Snapshot is created by a Backuper after file system change is detected and
+    A Snapshot is creates by a Backuper after file system change is detected and
     only if one of the upper layer objects said to do a backup (instruction, client and etc..).
     it stores all information needed to verify integrity and restore the file
     to its previous state via RollBacker.
