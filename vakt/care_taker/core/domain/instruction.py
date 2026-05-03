@@ -49,14 +49,28 @@ class Instruction:
     An Immutable, dispatcher-layer object that represents a pre-defined
     behavioral contract for specific class of o file system events.
 
-    An instruction is not creates in response to a single event -
+    An instruction is not created in response to a single event -
     it is defined in advance by the user or system configuration,
     and describes what actions should be taken when a matching event occurs.
 
-    InstructionManager is responsible for matching incoming Events against
-    all registered Instruction in InstructionStorage and selecting the most
-    appropriate one. If not match is found in storage,
-    a default Instruction is used.
+    -------------------------------------------------------------------------------------------
+    ###########################################################################
+    # InstructionManager is responsible for matching incoming Events against  #
+    # all registered Instruction in InstructionStorage and selecting the most #
+    # appropriate one. If not match is found in storage,                      #
+    # a default Instruction is used.                                          #
+    ###########################################################################
+    ###########################################################################################
+    # CHANGELOG:                                                                              #
+    #     - InstructionStorage is responsible for matching incoming Events against            #
+    #         all registered Instructions in itself. It enables to give other developers      #
+    #         to implement their own logic in giving most appropriate one.                    #
+    #     - But InstructionManager doesn't disappears it serves like wrapper of storage and   #
+    #         returns default instruction if not found any matching instruction to incoming   #
+    #         Event. This was done deliberately to add another logic for instructions.        #
+    ###########################################################################################
+    -------------------------------------------------------------------------------------------
+
 
     Unlike Event (which describes what happened ), Instruction describes what
     should happen as a consequence. it is the bridge between observation and action
@@ -64,7 +78,7 @@ class Instruction:
 
     Attributes:
         - event_type:    Collection of EventType values this instruction applies to.
-                            An incoming event matches if its type is in this application.
+                            An incoming event matches if its type is in this collection.
         - paths:         Glob Patterns of file system paths the instrcution applies to.
         - level:         Semantic classification of the event path.
                             Used by handlers to decide how to present or react to the event.
@@ -77,7 +91,7 @@ class Instruction:
             Any modifications requires creating a new instruction.
         - instruction does not contain processing logic. It is a pure data object.
         - Multiple Instruction may match a single event, Resolution strategy
-            (e.g. priority, first-match) is the responsibility of InstructionManager.
+            (e.g. priority, first-match) is the responsibility of InstructionStorage.
         - If you use Custom Event Type you need to provide it inherited from EventType and
             add handlers that support those custom event types.
         - If you want to apply one instruction to all events in provided path, use "all".
