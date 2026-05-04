@@ -98,3 +98,24 @@ class BaseSnapshotsStorage(ABC):
         ignore and does nothing.
         """
         ...
+
+    @abstractmethod
+    def clear(self, path: str) -> None:
+        """
+        Removes all Snapshots from the SnapshotsStorage for the given path.
+        Intended only for external management utilities.
+        Should silently ignore if no Snapshots exist for the given path.
+        Ensure that implementation removes all metadata of all Snapshots
+        for the given path.
+        """
+        ...
+
+    @abstractmethod
+    def clear_all(self) -> None:
+        """
+        Removes all Snapshots of all paths in the SnapshotsStorage.
+        Intended only for external management utilities.
+        Should silently ignore if Snapshots storage is already empty/
+        Ensure that implementation removes all metadata from registry too.
+        """
+        ...

@@ -72,3 +72,12 @@ class BaseInstructionStorage(ABC):
         Should silently ignore if target does not exist.
         """
         ...
+
+    @abstractmethod
+    def clear(self) -> None:
+        """
+        Removes all Instructions from the registry.
+        Intended only for external management utilities.
+        Should silently ignore if registry is already empty.
+        """
+        ...
