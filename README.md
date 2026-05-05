@@ -14,12 +14,11 @@
 ---
 
 ### 🗺️ Structure
-
+```
 Python-Journey/
-
     └── snaps/ # snaps-cacher — caching library
     └── vakt/ # vakt - file system watcher daemon
-
+```
 ---
 
 _More projects coming as I grow._
