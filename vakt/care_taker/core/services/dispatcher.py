@@ -1,0 +1,129 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+from queue import Empty, Queue
+from threading import Event as ShutdownEvent
+from threading import Thread
+
+from ..domain import Event, EventContext
+from ..ports import BaseHandler
+from .instruction_manager import InstructionManager
+
+
+class Dispatcher:
+    """
+    Dispatcher-layer service responsible for processing incoming Events
+    from the buffer and orchestrating all registered handlers.
+
+    Dispatcher runs in its own thread (Dispatcher Thread) and continuously
+    reads Events from thread-safe buffer produced by the Watcher Thread that puts
+    Events to that buffer. For each Event it creates an EventContext temporary event
+    processed state object that serves to give knowledge for all handlers what is done and
+    what don't happened yet. Retrieves the appropriate Instruction from InstructionManager and
+    drives all handlers through a progress loop until no handlers can make further progress.
+
+    Ignoring Mechanism:
+        Dispatcher maintains a shared ignoring_paths sequence that is injected
+        into all handlers that opt into the mechanism by setting their ignoring_paths
+        attribute to an empty sequence instead of None. When handlers adds a path to ignoring_paths,
+        Dispatcher will skip and discard any incoming Event with that path from the buffer
+        that enables to ignore changes that processed with handlers via giving knowledge to
+        dispatcher and any type of handlers by shared sequence.
+
+    Handlers Loop:
+        Dispatcher iterates over all handlers in a loop on every Event.
+        On each iteration it checks can_handle() and is_done() for each handler.
+        The loop continues as long as at least one handler makes progress.
+        This enables handler to depend on results of other handlers
+        without explicit coupling between them.
+
+    Notes:
+        - Dispatcher does not implement any business logic itself,
+            All logic resides in handlers and InstructionManager.
+            Disptacher only responsible for orchestrating them.
+        - Dispatcher is also responsible for graceful shutdown as a Watcher that
+            receives Event to a buffer, It checks shutdown_event on every iteration and stops
+            after processing all Events that were placed in the buffered by the
+            Watcher before it terminates.
+        - Dispatcher is the only component responsible for managing
+            ignoring_paths lifecycle.
+        - Why can’t we use a sequence that enforces uniqueness like a set for ignoring_paths:
+            Cause using a set-like structure introduces a correctness issue.
+            If multiple handlers modify on the same object in the file system,
+            them may attempt to register that object independently. Due to the
+            uniqueness constraint of a set, duplicate paths are collapsed.
+            As a result, the dispatcher effectively ignores for event only once,
+            even though multiple handlers depend on it. This may cause
+            inconsistent state or even corruption of the object.
+        - Ensure that the implementation of BaseHandler must use ignoring_paths in a lock
+            if handlers work on its own thread to avoid race condition or other exceptions.
+    """
+
+    def __init__(
+        self,
+        buffer: Queue[Event],
+        instruction_manager: InstructionManager,
+        handlers: Sequence[BaseHandler],
+        shutdown_event: ShutdownEvent,
+    ) -> None:
+        """
+        Initializes all attributes and injects shared ignoring_paths into handlers
+        only if they need it to work properly.
+        """
+        self._buffer: Queue[Event] = buffer
+        self._instruction_manager: InstructionManager = instruction_manager
+        self._handlers: Sequence[BaseHandler] = handlers
+        self._ignoring_paths: list[str] = []
+        self._shutdown_event: ShutdownEvent = shutdown_event
+        self._thread = Thread(target=self._run, daemon=True, name="dispatcher")
+
+        for handler in handlers:
+            if handler.ignoring_paths is not None:
+                handler.ignoring_paths = self._ignoring_paths
+
+    def start(self) -> None:
+        """Starts the Dispatcher thread."""
+        self._thread.start()
+
+    def stop(self) -> None:
+        """
+        Stops the Dispatcher thread by waiting for it to finish processing
+        all Events in the buffer. Should be called after shutdown_event is
+        set by the upper layer.
+        """
+        self._thread.join()
+
+    def _run(self) -> None:
+        """
+        Main loop of the Dispatcher thread that processes
+        all events getting them from the buffer.
+        """
+        while not self._shutdown_event.is_set() and not self._buffer.empty():
+            try:
+                event = self._buffer.get(timeout=1)
+            except Empty:
+                continue
+
+            if event.path in self._ignoring_paths:
+                self._ignoring_paths.remove(event.path)
+                continue
+
+            instruction = self._instruction_manager.get(event)
+            ctx = EventContext(event=event, instruction=instruction)
+            self._process(ctx)
+
+    def _process(self, ctx: EventContext) -> None:
+        """
+        Drives all handlers through the progress loop for the given
+        EventContext while at least one handler makes progress.
+        """
+        while True:
+            progress = False
+
+            for handler in self._handlers:
+                if handler.can_handle(ctx) and not handler.is_done(ctx):
+                    handler.handle(ctx)
+                    progress = True
+
+            if not progress:
+                break

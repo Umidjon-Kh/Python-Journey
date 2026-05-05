@@ -35,16 +35,16 @@ class BaseHandler(ABC):
             All error handling is responsibility of the implementation.
         - Handler does not contain any storage or external state by default.
             If implementation requires it, it must be provided via __init__.
-        - ignoring_paths is an optional shared set provided by Dispatcher on initialization.
+        - ignoring_paths is an optional shared sequence provided by Dispatcher on initialization.
             If handler needs to prevent Dispatcher from processing specific paths
             (for example while RollBacker is restoring a file), it must set
-            ignoring_paths to set sequence instead of None to signal Dispatcher
+            ignoring_paths to sequence instead of None to signal Dispatcher
             that this handler wants to participate in path ignoring mechanism.
-            Dispatcher will then inject the shared ignoring_paths set into this handler.
+            Dispatcher will then inject the shared ignoring_paths sequence into this handler.
             Handlers that do not need this mechanism should leave ignoring_paths as None.
     """
 
-    ignoring_paths: Optional[set[str]] = None
+    ignoring_paths: Optional[list[str]] = None
 
     @abstractmethod
     def can_handle(self, ctx: EventContext) -> bool:
