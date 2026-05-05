@@ -106,11 +106,13 @@ class Dispatcher:
 
             if event.path in self._ignoring_paths:
                 self._ignoring_paths.remove(event.path)
+                self._buffer.task_done()
                 continue
 
             instruction = self._instruction_manager.get(event)
             ctx = EventContext(event=event, instruction=instruction)
             self._process(ctx)
+            self._buffer.task_done()
 
     def _process(self, ctx: EventContext) -> None:
         """

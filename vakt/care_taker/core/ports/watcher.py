@@ -25,7 +25,7 @@ class BaseWatcher(ABC):
         - It must never block indefinitely without checking shutdown_event.
         - Watcher has not knowledge where to subscribe, it
             only subscribes to provided paths, Providing those paths is
-            responsibility of the bootstrap of any upper layer object.
+            responsibility of the bootstrap or any upper layer object.
     """
 
     @abstractmethod
