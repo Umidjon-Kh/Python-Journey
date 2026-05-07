@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from ..domain import Snapshot
 
@@ -44,6 +44,9 @@ class BaseSnapshotsStorage(ABC):
             damaging registry metadata itself, manually deleting
             or doing any other operates with snapshots using
             not supported programs.
+        - show() is also not used by the daemon itself. It is intended
+            only for external management utilities or interfaces like
+            method delete(). It only serves to show a whole registry.
         - Storage does not contain any business logic,
             It is pure registry of Snapshot objects.
         - Storage does not require thread-safe, cause base implementation
@@ -82,6 +85,15 @@ class BaseSnapshotsStorage(ABC):
         Returns all Snapshots for the given path ordered
         by created date ascending. It's required for objects that need
         to work with all snapshots to enable client management with snapshots.
+        """
+        ...
+
+    @abstractmethod
+    def show(self) -> Mapping[str, Sequence[Snapshot]]:
+        """
+        Returns a whole registry mapping object that contains all
+        Snapshots metadata. It's required for external management utilities that
+        need to get metadata of al registry.
         """
         ...
 
