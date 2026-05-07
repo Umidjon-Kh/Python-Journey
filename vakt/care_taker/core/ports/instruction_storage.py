@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from typing import Any, Optional
 
 from ..domain import Event, Instruction
@@ -33,6 +34,9 @@ class BaseInstructionStorage(ABC):
     Notes:
         - delete() is not used by the daemon itself. It is intended
             only for external management utilities or interfaces.
+        - show() is also not used by the daemon itself. It is intended
+            only for external management utilities or interfaces like
+            method delete(). It only serves to show a whole registry.
         - Storage does not contain any business logic beyond matching.
             It is a pure registry of Instruction objects.
         - Storage does not require thread-safety, it is only used
@@ -59,6 +63,15 @@ class BaseInstructionStorage(ABC):
         Returns NoneType object if no matching Instruction is found.
         InstructionManager is responsible for handling the None case
         by providing a default Instruciton.
+        """
+        ...
+
+    @abstractmethod
+    def show(self) -> Sequence[Instruction]:
+        """
+        Returns all Instructions from the registry.
+        Intended only for external management utilities or interfaces
+        that need to get all registered Instructions.
         """
         ...
 
