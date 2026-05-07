@@ -206,6 +206,7 @@ class InotifyWatcher(BaseWatcher):
         Why returns annotation is Optional:
             It's done to stub strictly pyright linter.
             If it works correctly, It must never return NoneType object at all.
+            Cause we only subscribed to changes that supports base EventType.
         """
         mapping = _DIR_MASK_TO_EVENT_TYPE if is_dir else _MASK_TO_EVENT_TYPE
 
