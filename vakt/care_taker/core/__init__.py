@@ -1,4 +1,11 @@
-from .domain import Event, EventContext, EventType, Instruction, Snapshot
+from .domain import (
+    Event,
+    EventContext,
+    EventType,
+    Instruction,
+    LevelType,
+    Snapshot,
+)
 from .ports import (
     BaseHandler,
     BaseHeartBeat,
@@ -14,6 +21,7 @@ __all__ = [
     "EventType",
     "EventContext",
     "Instruction",
+    "LevelType",
     "Snapshot",
     "BaseHandler",
     "BaseHeartBeat",
