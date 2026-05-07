@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Generator
 
 from ..domain import Event
 
@@ -34,6 +33,12 @@ class BaseWatcher(ABC):
         Starts watching. Called once before the watcher loop begins.
         Uses to subscribe to all objects in provided paths. Initializes
         resources file descriptor and watch descriptor.
+        After this runs Watcher Thread with self.events method.
+        Why events method is splitted from start:
+            This is done intentionally to avoid mixing
+            two logics in one place, creating unnecessary noise that
+            can interfere with the correct reading of the code, even if they are
+            called in the same place.
         """
         ...
 
@@ -47,9 +52,9 @@ class BaseWatcher(ABC):
         ...
 
     @abstractmethod
-    def events(self) -> Generator[Event, None, None]:
+    def events(self) -> None:
         """
-        Yields Events as file system changes are detected
+        Puts Events into a buffer as a file system changes are detected
         in subscribed objects. This method runs in a loop inside Watcher Thread.
         Must yield control periodically to allow shutdown checks.
         """

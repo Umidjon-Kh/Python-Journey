@@ -1,9 +1,4 @@
-from .domain import (
-    Event,
-    EventContext,
-    Instruction,
-    Snapshot,
-)
+from .domain import Event, EventContext, EventType, Instruction, Snapshot
 from .ports import (
     BaseHandler,
     BaseHeartBeat,
@@ -16,6 +11,7 @@ from .services import Dispatcher, InstructionManager
 
 __all__ = [
     "Event",
+    "EventType",
     "EventContext",
     "Instruction",
     "Snapshot",
