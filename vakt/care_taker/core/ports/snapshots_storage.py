@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
+from typing import Optional
 
 from ..domain import Snapshot
 
@@ -66,7 +67,7 @@ class BaseSnapshotsStorage(ABC):
         ...
 
     @abstractmethod
-    def get(self, path: str, index: int) -> Snapshot:
+    def get(self, path: str, index: int) -> Optional[Snapshot]:
         """
         Returns a single Snapshot for given path at the given index.
         Index follows standard Python sequence indexing,
