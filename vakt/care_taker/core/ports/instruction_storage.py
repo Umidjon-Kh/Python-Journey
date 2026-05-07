@@ -26,10 +26,11 @@ class BaseInstructionStorage(ABC):
     a default Instruction to the Dispatcher.
 
     Persistence:
-        - InstructionStorage loads Instruction from a config file on startup.
-        - It does not persist changes automatically like SnapshotsStorage.
-            Managing Instructions at runtime is responsibility of
-            external management utilities.
+        - InstructionStorage loads Instructions from a config file on startup.
+        - It persists changes automatically on every registry modification
+            (add, delete, clear) to prevent metadata loss on crash,
+            same as SnapshotsStorage.
+
 
     Notes:
         - delete() is not used by the daemon itself. It is intended
