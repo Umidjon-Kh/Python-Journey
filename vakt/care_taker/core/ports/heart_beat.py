@@ -11,7 +11,7 @@ class BaseHeartBeat(ABC):
     to an external process supervisor to indicate that the daemon is alive
     and functioning correct.
 
-    If the signal is not sent withint the xpected interval, the supervisor
+    If the signal is not sent withint the expected interval, the supervisor
     assums the daemon is dead or frozen and may restart the process.
 
     This is a critical component for daemons that must run 24/7 without
