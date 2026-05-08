@@ -15,7 +15,7 @@ class EventContext:
     of a single file system change.
 
     The EventContext is instantiated by the dispatcher after an event is retrieved
-    from the buffer. The dispatacher puts event into an EventContext and enriches it with
+    from the buffer. The dispatcher puts event into an EventContext and enriches it with
     transient processing states. This enables components to reason about what has already
     happened and what has not yet been processed yet within the scope of the current event.
 
@@ -25,12 +25,15 @@ class EventContext:
     the instance is discarded.
 
     Attributes:
-        - event:       The Event instance currently being processed.
-        - instruction: The instruction associated with the current event.
-        - backed_up:  Tombstone that defines backed up object of event or not.
-        - rolled_back: Tombstone that defines rolled back object of event or not.
-        - snapshot:    Optional field that needed only to represent snapshot
-                        if it was created by Backuper for this event.
+        - event:              The Event instance currently being processed.
+        - instruction:          The instruction associated with the current event.
+        - backed_up:          Flag that indicates whether the object was backed up.
+        - rolled_back:        Flag that indicates whether the object was rolled back.
+        - snapshot:           Optional field that needed only to represent snapshot
+                                if it was created by Backuper for this event.
+        - processed_handlers: The counter that serves to let give knowledge about
+                                how many handlers processed their work with current event.
+        - handlers_count:     The count of how many handlers can process with current event.
 
     Notes:
         - Mutability is intentional. Handlers use the EventContext to track progress
@@ -39,6 +42,8 @@ class EventContext:
         - EventContext does not implement any business logic or decision-making.
             All behavioral logic resides in the handlers. The object acts purely as a
             state carrier reflecting the current processing status of the event.
+        - Both (processed_handlers and handlers_count) serves to give knowledge
+            about how many handlers processed with current event for specific handlers variations.
     """
 
     event: Event
@@ -46,3 +51,5 @@ class EventContext:
     backed_up: bool = False
     rolled_back: bool = False
     snapshot: Optional[Snapshot] = None
+    processed_handlers: int = 0
+    handlers_count: int = 0
