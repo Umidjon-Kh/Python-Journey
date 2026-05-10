@@ -81,7 +81,7 @@ class InstructionManager:
         instruction = Instruction(
             paths=paths,
             event_types=event_types,
-            level=level,
+            level=level or LevelType.INFO,
             should_log=should_log,
             should_backup=should_backup,
             should_notify=should_notify,

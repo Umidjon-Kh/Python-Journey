@@ -110,7 +110,7 @@ class Instruction:
 
     event_types: Optional[Sequence[EventType]] = None
     paths: Optional[Sequence[str]] = None
-    level: Optional[LevelType] = None
+    level: LevelType = LevelType.INFO
     should_log: bool = True
     should_backup: bool = False
     should_notify: bool = False
