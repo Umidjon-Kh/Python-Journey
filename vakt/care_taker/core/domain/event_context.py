@@ -48,8 +48,8 @@ class EventContext:
 
     event: Event
     instruction: Instruction
+    handlers_count: int
     backed_up: bool = False
     rolled_back: bool = False
     snapshot: Optional[Snapshot] = None
     processed_handlers: int = 0
-    handlers_count: int = 0

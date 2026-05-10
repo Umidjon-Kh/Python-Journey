@@ -110,7 +110,11 @@ class Dispatcher:
                 continue
 
             instruction = self._instruction_manager.get(event)
-            ctx = EventContext(event=event, instruction=instruction)
+            ctx = EventContext(
+                event=event,
+                instruction=instruction,
+                handlers_count=len(self._handlers),
+            )
             self._process(ctx)
             self._buffer.task_done()
 
