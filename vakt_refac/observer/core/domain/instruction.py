@@ -128,4 +128,4 @@ class Instruction:
     event_types: Optional[Sequence[EventType]] = None
     paths: Optional[Sequence[str]] = None
     level: LevelType = LevelType.INFO
-    types: Optional[Sequence[InstructionType]] = None
+    shoulds: Optional[Sequence[InstructionType]] = None

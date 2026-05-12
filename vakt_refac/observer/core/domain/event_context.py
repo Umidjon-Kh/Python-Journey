@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -89,4 +90,4 @@ class EventContext:
     snapshot: Optional[Snapshot] = None
     processed_handlers: int = 0
     handlers_count: int = 0
-    performed: list[InstructionType] = field(default_factory=list)
+    performed: Sequence[InstructionType] = field(default_factory=list)
