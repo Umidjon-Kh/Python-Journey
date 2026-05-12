@@ -1,43 +1,39 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
+
+from .event_type import EventType
 
 
-class EventType(StrEnum):
+class CrossPlatformEventType(EventType):
     """
-    Domain-level file system event types.
+    Cross-platform file system event types.
 
-    StrEnum allows comparing with plain strings which is useful
-    for matching and human-readable.
+    Defines the minimal, conservative set of file system events that can
+    be reliably observed across different operating systems and file system
+    implementations. This is the default EventType implementation that
+    should be used by all cross-platform components.
 
-    For example it can be usable:
-        In main objects:
-            - watcher: to compare the observers's flag or mask with event type.
-        In handlers:
-            - logger: to show the event that happened in str not in confusing int.
-            - notifier: to match event type with notifier condition that creates notify.
-            - snapshots: to save a description of when this snapshot is created.
+    Why conservative:
+        This abstraction intentionally excludes platform-specific or
+        inconsistently supported events such as file open, access, or
+        certain metadata changes in order to provide a stable and portable
+        contract for consumers regardless of the underlying platform.
+
+    Extension:
+        For platform-specific semantics create a subclass of EventType:
+            - InotifyEventType: Linux inotify specific events
+            - FanotifyEventType: Linux fanotify specific events
+            - WindowsEventType: Windows specific events
+
+        Such extensions are not automatically supported by the core
+        processing pipeline. Consumers introducing custom event types
+        are responsible for providing compatible handlers that explicitly
+        recognize and handle those extended semantics.
 
     Notes:
-        - EventType is a StrEnum that defines the minimal, cross-platform abstraction
-            of file system events. It includes only those event categories that can be reliably
-            observed across different operating systems and file systems implementations.
-        - This abstraction is intentionally conservative: it excludes platform-specifics or
-            inconsistently supported events (such as open, access, or certain metadata changes)
-            in order to provide a stable and portable contract for consumers.
-        - For use cases that require higher fidelity or platform-specific semantics.
-            EventType is designed to be extended. Custom enumerations for example:
-            LinuxEventType, WindowsEventType - may introduce additional event
-            categories aligned with the capabilities of underlying platform.
-        - Such extensions are not automatically supported by the core processing
-            pipeline. Consumers introducing custom event types are responsible for providing
-            compatible processing components - such as specialized notifiers, dispatchers,
-            or handlers - that explicitly recognize and handle those extended semantics.
-
-        In other words, extending the event model requires corresponding extensions in
-        the event handling layer to ensure correct propagation and interpretation of
-        platform-specific events.
+        - All values are lowercase strings for human readability.
+        - File and directory events are separated for semantic clarity.
     """
 
     # File events
@@ -59,17 +55,23 @@ class EventType(StrEnum):
 @dataclass(frozen=True, slots=True)
 class Event:
     """
-    An Immutable, domain-level object used to
-    represent a single changes in the file system.
+    An immutable domain-level object representing a single
+    change in the file system.
 
     Attributes:
-        - path:       absolute path of changed file or directory.
-        - event_type: what kind of change occurred.
-        - timestamp:  monotonic timestamp captured by the watcher at
-                      the moment of kernel delivered the event.
+        - path:       Absolute path of the changed file or directory.
+        - event_type: What kind of change occurred.
+                        Accepts any EventType subclass value enabling
+                        platform-specific event types to flow through
+                        the pipeline without modification.
+        - timestamp:  Monotonic timestamp captured by the watcher at
+                        the moment the kernel delivered the event.
+
     Notes:
-        - it is immutable because the event describes an event that
-            has already occurred in the file system.
+        - Event is immutable because it describes something that has
+            already occurred in the file system and must not be modified.
+        - event_type is typed as EventType to accept both
+            CrossPlatformEventType and any platform-specific subclass.
     """
 
     path: str
