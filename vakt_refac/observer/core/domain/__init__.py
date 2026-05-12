@@ -1,4 +1,5 @@
 from .event import Event, EventType
+from .event_context import EventContext
 from .instruction import Instruction, InstructionType, LevelType
 from .snapshot import Snapshot
 
@@ -9,4 +10,5 @@ __all__ = [
     "InstructionType",
     "LevelType",
     "Snapshot",
+    "EventContext",
 ]
