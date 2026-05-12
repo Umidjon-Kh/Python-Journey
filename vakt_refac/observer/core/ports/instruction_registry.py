@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from collections.abc import Sequence
+from typing import Any
+
+from ..domain import Event, Instruction
+
+
+class BaseInstructionRegistry(ABC):
+    """
+    Abstract base class for instruction registry.
+
+    InstructionRegistry is responsible for two things at once:
+        1. Registry - stores and manages Instruction objects.
+        2. Matcher - selects the most appropriate Instruction
+            for an incoming Event based on its own matching strategy.
+
+    This design enables developers to provide their own matching logic:
+        - JsonGlobInstructionRegistry: matches by glob patterns in Instruction.paths
+        - RegexInstructionRegistry: matches by regex patterns
+        - PriorityInstructionRegistry: matches by priority rules
+
+    get() always returns an Instruction - if no matching Instruction is found,
+    it returns a default Instruction provided via __init__ of the implementation.
+    This guarantees that Dispatcher always receives a valid Instruction.
+
+    Persistence Requirements:
+        All implementations MUST persist the registry after every modification
+        (add, delete, clear) to prevent metadata loss on crash.
+        This is not optional - it is a critical requirement for data integrity.
+        If the daemon crashes between an add() and registry persistence,
+        the Instruction will be lost and will not be available on next startup.
+
+        Recommended approach:
+            - Persist registry immediately after every modification.
+            - Use atomic write operations where possible to avoid corrupted
+                registry files on crash during write.
+            - Load registry from persistent storage on initialization.
+
+    Implementations Example:
+        - JsonGlobInstructionRegistry: stores Instructions in JSON,
+            matches by glob patterns.
+        - RegexInstructionRegistry: stores Instructions in JSON,
+            matches by regex patterns.
+
+    Notes:
+        - get() is used by Dispatcher to retrieve Instruction for each Event.
+        - add(), delete(), clear(), show() are intended only for external
+            management utilities and bootstrap configuration.
+        - By default does not require thread-safety as it is only used
+            by Dispatcher which operates in a single thread.
+        - All implementations not strictly required to respect graceful
+            shutdown as it is responsibility of upper layer objects.
+    """
+
+    @abstractmethod
+    def add(self, instruction: Instruction) -> None:
+        """
+        Adds an Instruction to the registry.
+        Implementations must persist the registry immediately after addition.
+        """
+        ...
+
+    @abstractmethod
+    def get(self, event: Event) -> Instruction:
+        """
+        Returns the most appropriate Instruction for the given Event
+        based on the implementation matching strategy.
+        Always returns a valid Instruction - returns default Instruction
+        if no matching Instruction is found in the registry.
+        Default Instruction is provided via __init__ of the implementation.
+        """
+        ...
+
+    @abstractmethod
+    def show(self) -> Sequence[Instruction]:
+        """
+        Returns all Instructions from the registry.
+        Intended only for external management utilities.
+        """
+        ...
+
+    @abstractmethod
+    def delete(self, target: Any) -> None:
+        """
+        Removes an Instruction from the registry by the given target.
+        Target type depends on the implementation - it can be an index,
+        an object, a string or any other identifier.
+        Intended only for external management utilities.
+        Silently ignores if target does not exist.
+        Implementations must persist the registry immediately after deletion.
+        """
+        ...
+
+    @abstractmethod
+    def clear(self) -> None:
+        """
+        Removes all Instructions from the registry.
+        Intended only for external management utilities.
+        Silently ignores if registry is already empty.
+        Implementations must persist the registry immediately after clearing.
+        """
+        ...

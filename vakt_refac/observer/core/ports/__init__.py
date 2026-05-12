@@ -1,5 +1,6 @@
 from .handler import BaseHandler
 from .heart_beat import BaseHeartBeat
+from .instruction_registry import BaseInstructionRegistry
 from .path_lock import BasePathLock
 from .snapshots_registry_store import BaseSnapshotsRegistryStore
 from .watcher import BaseWatcher
@@ -10,4 +11,5 @@ __all__ = [
     "BaseHeartBeat",
     "BaseHandler",
     "BaseSnapshotsRegistryStore",
+    "BaseInstructionRegistry",
 ]
