@@ -11,7 +11,7 @@ from ..ports import BaseHandler, BaseInstructionRegistry
 
 class Dispatcher:
     """
-    Dispatcher-layer service responsible fro processing incoming Events
+    Dispatcher-layer service responsible for processing incoming Events
     from the buffer and orchestrating all registered handlers.
 
     Dispatcher runs in its own thread (Dispatcher Thread) and continuously
@@ -32,7 +32,7 @@ class Dispatcher:
 
     Handlers Loop:
         Dispatcher iterates over all handlers in a loop on every Event.
-        On each iteration it checks can_handle() and is_done() fro each handler.
+        On each iteration it checks can_handle() and is_done() for each handler.
         The loop continues as long as at least one handler makes progress.
         This enables handler to depend on results of other performed handlers
         without explicit coupling between them. All handlers use EventContext.performed
@@ -52,7 +52,8 @@ class Dispatcher:
             If multiple handlers modify on the same object in the file system,
             them may attempt to register that object independently. Due to the
             uniqueness constraint of a set-like structures, duplicate paths are collapsed.
-            A a result, the dispatcher effectively ignores for the event only once,
+            As a result, the dispatcher effectively ignores for the event only once,
+            even though multiple handlers depend on it. This may cause
             inconsistent state or even corruption of the object.
         - Ensure that the implementation of BaseHandler must use ignoring_paths in a lock,
             if handlers work on its own thread to avoid race conditions or other exceptions.
@@ -97,7 +98,7 @@ class Dispatcher:
         Main loop of the Dispatcher Thread that processes
         all events getting them from the buffer.
         """
-        while not self._shutdown_event.is_set() and not self._buffer.empty():
+        while not self._shutdown_event.is_set() or not self._buffer.empty():
             try:
                 event = self._buffer.get(timeout=1)
             except Empty:
