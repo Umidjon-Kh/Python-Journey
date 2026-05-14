@@ -138,5 +138,5 @@ class Instruction:
 
     event_types: Optional[Sequence[EventType]] = None
     paths: Optional[Sequence[str]] = None
-    level: LevelType = LevelType.INFO  # type: ignore[assigment]
+    level: LevelType = LevelType.INFO  # type: ignore[assignment]
     types: Optional[Sequence[InstructionType]] = None
