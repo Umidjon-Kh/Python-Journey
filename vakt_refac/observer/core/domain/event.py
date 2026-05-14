@@ -2,7 +2,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .event_type import EventType
+from .semantic_type import SemanticType
+
+
+class EventType(SemanticType):
+    """
+    Base class for all file system event types.
+
+    EventType serves as the common ancestor for all event type
+    implementations both cross-platform and platform-specific.
+    It enables type annotations that accept any event type regardless
+    of the underlying platform or kernel subsystem.
+
+    Subclass this to create platform-specific event types:
+        - CrossPlatformEventType: cross-platform events
+        - InotifyEventType: Linux inotify specific events
+        - FanotifyEventType: Linux fanotify specific events
+        - WindowsEventType: Windows specific events
+    """
 
 
 class CrossPlatformEventType(EventType):
