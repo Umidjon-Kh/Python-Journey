@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Optional
 
 
 class EventType(StrEnum):
@@ -63,10 +64,13 @@ class Event:
     represent a single changes in the file system.
 
     Attributes:
-        - path:       absolute path of changed file or directory.
-        - event_type: what kind of change occurred.
-        - timestamp:  monotonic timestamp captured by the watcher at
-                      the moment of kernel delivered the event.
+        - path:          Absolute path of changed file or directory.
+        - event_type:    What kind of change occurred.
+        - timestamp:     Monotonic timestamp captured by the watcher at
+                            the moment of kernel delivered the event.
+        - previous_path: Optional absolute path of changed file or directory,
+                            serves to represent the previous path of object
+                            before moving it.
     Notes:
         - it is immutable because the event describes an event that
             has already occurred in the file system.
@@ -75,3 +79,4 @@ class Event:
     path: str
     event_type: EventType
     timestamp: float
+    previous_path: Optional[str] = None
