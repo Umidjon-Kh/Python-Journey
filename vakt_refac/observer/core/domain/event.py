@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 from .semantic_type import SemanticType
 
@@ -76,13 +77,16 @@ class Event:
     change in the file system.
 
     Attributes:
-        - path:       Absolute path of the changed file or directory.
-        - event_type: What kind of change occurred.
-                        Accepts any EventType subclass value enabling
-                        platform-specific event types to flow through
-                        the pipeline without modification.
-        - timestamp:  Monotonic timestamp captured by the watcher at
-                        the moment the kernel delivered the event.
+        - path:          Absolute path of the changed file or directory.
+        - event_type:    What kind of change occurred.
+                            Accepts any EventType subclass value enabling
+                            platform-specific event types to flow through
+                            the pipeline without modification.
+        - timestamp:     Monotonic timestamp captured by the watcher at
+                            the moment the kernel delivered the event.
+        - previous_path: Optional absolute path of changed file or directory,
+                            serves to represent the previous path of object
+                            before moving it.
 
     Notes:
         - Event is immutable because it describes something that has
@@ -94,3 +98,4 @@ class Event:
     path: str
     event_type: EventType
     timestamp: float
+    previous_path: Optional[str] = None
