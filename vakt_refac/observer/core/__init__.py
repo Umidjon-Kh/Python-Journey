@@ -3,7 +3,6 @@ from .domain import (
     Event,
     EventContext,
     EventType,
-    EventTypeMeta,
     Instruction,
     InstructionType,
     LevelType,
@@ -22,7 +21,7 @@ from .services import Dispatcher
 __all__ = [
     "Event",
     "CrossPlatformEventType",
-    "EventTypeMeta",
+    "EventType",
     "EventContext",
     "EventType",
     "Instruction",
