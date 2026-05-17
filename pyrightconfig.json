@@ -1,5 +1,0 @@
-{
-    "stubPath": "stubs",
-    "include": ["vakt_refac", "snaps", "tools"],
-    "exclude": ["**/__pycache__", "**/.*"],
-}
