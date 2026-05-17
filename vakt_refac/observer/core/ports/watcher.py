@@ -23,6 +23,12 @@ class BaseWatcher(ABC):
         - WindowsWatcher:  Windows, uses ReadDirectoryChangesW.
         - PollingWatcher:  Cross-platform, uses os.stat() polling.
 
+    Rule of Path Syntax for all Implementations:
+        /some/path/**       -> recursive: watches path and all subpaths in this path.
+        /some/path/*        -> non-recursive: watches only direct contents of path.
+        /some/path          -> no suffix: silently normalized to /some/path/* by
+                                implementation.
+
     Notes:
         - Watcher runs in its own thread (Watcher Thread).
         - It must respect shutdown_event to stop gracefully.
