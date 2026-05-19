@@ -21,7 +21,6 @@ from .services import Dispatcher
 __all__ = [
     "Event",
     "CrossPlatformEventType",
-    "EventType",
     "EventContext",
     "EventType",
     "Instruction",

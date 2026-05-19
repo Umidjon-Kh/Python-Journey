@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from typing import Optional
 
-from ..domain import Snapshot
+from ..domain import Event, Snapshot
 
 
 class BaseSnapshotsRegistryStore(ABC):
@@ -59,9 +59,9 @@ class BaseSnapshotsRegistryStore(ABC):
     """
 
     @abstractmethod
-    def create(self, path: str) -> Snapshot:
+    def create(self, event: Event) -> Snapshot:
         """
-        Creates a physical backup of the file system object at the given path,
+        Creates a physical backup of the file system object described by the given event,
         adds it to the registry and returns the created Snapshot.
         Implementations must persist the registry immediately after creation.
         """
