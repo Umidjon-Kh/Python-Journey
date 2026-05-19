@@ -24,13 +24,20 @@ class BasePathLock(ABC):
         - Implementations must ensure that release() is always called
             after acquire(), even if an error occurs. Use try/finally
             or implement __enter__/__exit__ properly.
-        - A single PathLock instance can be reused across different paths.
         - In base abstract cls not strictly requires __enter__/__exit__ methods
             implementations to work with context manager it only depends of realization.
         - Method release requires path to cause it enables to create an implementations
             that lock not one object at one time. But ensure this implementations have
             buffer of any other temporary sequence that stores and saves all acquired
             objects to release them after process of component is completed.
+        - A single PathLock instance is shared across all dependent components.
+            Therefore, the implementation must follow one of two strategies:
+            either lock at most one path at any given time, or maintain an internal
+            registry of acquired paths and release all of them after processing completes.
+        - If the implementation chooses to lock only one path at a time, it must ensure
+            that attempts to acquire a lock from other components while a lock is already
+            held, do not crash or disrupt their execution. The lock should block until
+            released and never throw an undanlded exception or cause a crash.
     """
 
     @abstractmethod

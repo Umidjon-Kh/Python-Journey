@@ -79,6 +79,10 @@ class BaseHandler(ABC):
             All error handling is the responsibility of the implementation.
         - Handler does not contain any storage or external state by default.
             If implementation requires it, it must be provided via __init__.
+        - If handler uses Ignoring Paths Mechanism, the SnapshotsRegistryStore
+            and PathLock instances are injected automaticcaly, without any
+            request from the handlers. So verify that the handler's "__init__"
+            method accepts these arguments.
     """
 
     ignoring_paths: Optional[list[str]] = None
