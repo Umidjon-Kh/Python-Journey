@@ -14,6 +14,7 @@ from ...core import (
     InstructionType,
     LevelType,
 )
+from ..utils import match_path
 
 
 class GlobInstructionRegistry(BaseInstructionRegistry):
@@ -29,36 +30,34 @@ class GlobInstructionRegistry(BaseInstructionRegistry):
         is returned. If no Instruction matches, the default Instruction
         provided via __init__ is returned.
 
-        Path scoring (higher is more specific):
-            4 - exact path match:       /etc/passwd == /etc/passwd
-            3 - non-recursive match:    /etc/*      matches /etc/passwd
-            2 - recursive match:        /etc/**     matches /etc/ssl/cert.pem
-            1 - paths is None:          matches any path it is semantic to root/**
-
-        Within the same path score level, longer base paths win:
-            /etc/ssl/** beats /etc/** for the path /etc/ssl/cert.pem
+        Path scoring:
+            Delegated to match_path() in ../utils/path_matcher.
+            See its documentation for full pattern syntax and priority rules.
 
         EventType scoring:
             1 - event.event_type is found in instruction.event_types
             0 - instruction.event_type is None
 
         Full priority table (descending):
-            1. exact path    | event_type equal
+            1. exact path    | event_type is found
             2. exact path    | event_type is None
-            3. /*            | event_type equal
-            4. /*            | event_type is None
-            5. /**           | event_type equal
-            6. /**           | event_type is None
-            7. paths is None | event_type equal
-            8. paths is None | event_type is None
-
+            3. segment wildcard | event_type is found
+            4. segment wildcard | event_type is None
+            5. deep glob with anchors | event_type is found
+            6. deep glob with anchors | event_type is None
+            7. non-recursive          | event_type is found
+            8. non-recursive          | event_type is None
+            9. recursive              | event_type is found
+            10. recursive             | event_type is None
+            11. global name/wildcard  | event_type is found
+            12. global_name/wildcard  | event_type is None
 
     Atomic Persistence:
         All registry modifications are persisted atomically using a
         write-to-temp-then-replace strategy. The registry is written to
         a temporary file first, then renamed over the target file via
         os.replace() which is atomic on the same file-system. This prevents
-        registry corruptionif the process crashes during a write.
+        registry corruption if the process crashes during a write.
         Furthermore, this operation is constant, meaning os.replace()
         executes in O(1) time, regardless of the registry size.
 
@@ -79,13 +78,15 @@ class GlobInstructionRegistry(BaseInstructionRegistry):
             A reason that allows top-level objects to set a default
             Instruction types for non-matching events.
         - Registry not checks to None in fields of Instruction, it checks
-            for boolean bool(field of instructon) to emit properly empty sequences.
+            for boolean bool(field of instruction) to emit properly empty sequences.
     """
 
     def __init__(self, registry_path: str, default: Instruction) -> None:
         """
-        Initializes the registry and loads persisted Instructions from disk.
-        Ensure that the path file is exists and its a JSON file in correct format.
+        Initializes the registry and loads persisted Instructions from
+        disk only if the registry file exists at provided registry_path,
+        So ensure that the paths exists and its a JSON type of file
+        with valid format only if you want to load persisted Instructions.
         """
         self._registry_path: Path = Path(registry_path)
         self._default: Instruction = default
@@ -96,7 +97,7 @@ class GlobInstructionRegistry(BaseInstructionRegistry):
     def add(self, instruction: Instruction) -> None:
         """
         Adds an Instruction to both registries and persists immediately.
-        New Instrcutions are appended to the end. Among Instrcutions with
+        New Instructions are appended to the end. Among Instructions with
         equal specificity the first added takes priority.
         """
         self._registry.append(instruction)
@@ -107,12 +108,14 @@ class GlobInstructionRegistry(BaseInstructionRegistry):
         """
         Returns the most specific matching Instruction for the given Event.
         Falls back to the default Instruction if no match is found.
+        Uses match_path utility from ../utils to determine the most appropriate
+        one of path patterns in instructions.
         """
         best: Optional[Instruction] = None
         best_score: tuple[int, int, int] = (-1, -1, -1)
 
         for instruction in self._registry:
-            path_score = self._match_path(event.path, instruction)
+            path_score = match_path(event.path, instruction.paths)
             if path_score is None:
                 continue
 
@@ -133,11 +136,16 @@ class GlobInstructionRegistry(BaseInstructionRegistry):
         return best if best is not None else self._default
 
     def show(self) -> Sequence[Instruction]:
-        """Returns all Instruction from the registry."""
+        """Returns all Instruction from the registry, not original only copy."""
         return self._registry.copy()
 
     def show_raw(self) -> list[dict]:
-        """Returns raw registry metadata, not original only copy."""
+        """
+        Returns the raw registry as a list of dicts, allowing upper layers
+        to display or serialize registry contents without manually
+        decomposing Instruction domain objects.
+        Also not original only copy.
+        """
         return self._raw_registry.copy()
 
     def delete(self, target: Any) -> None:
@@ -183,6 +191,8 @@ class GlobInstructionRegistry(BaseInstructionRegistry):
         Loads Instructions from the JSON registry file on disk.
         Silently skips loading if the file does not exists,
         So ensure that before providing registry_path.
+        Also if file exists, it must be a JSON type file with
+        valid format.
         """
         if not self._registry_path.exists():
             return
@@ -221,56 +231,3 @@ class GlobInstructionRegistry(BaseInstructionRegistry):
             "level": instruction.level,
             "types": (list(instruction.types) if instruction.types else None),
         }
-
-    @staticmethod
-    def _match_path(path: str, instruction: Instruction) -> Optional[tuple[int, int]]:
-        """
-        Returns a (path_level, base_len) score tuple if the event path
-        matches any pattern in instruction.paths, or None if no match.
-
-        Score meaning:
-            path_level: 4=exact, 3=non-recursive, 2=recursive, 1=None
-            base_len:   length of matched base path used as tiebreaker
-                        when two patterns have the same path_level.
-
-        Why base_len as tiebreaker:
-            /etc/ssl/** is more specific than /etc/** for /etc/ssl/cert.pem/
-            Both have path_level=2 but /etc/ssl has a longer base
-            so (2, 8) beats (3, 4).
-            Also in other situations that needs more specifity.
-
-        Non-recursive matching (/*):
-            Matches only direct children of the base directory.
-            /etc/* matches /etc/passwd but not /etc/ssl/cert.pem.
-            Checked by comparing the event path parent to the pattern base.
-
-        Recursive matching (/**):
-            Matches any descendant of the base directory at any depth.
-            /etc/** matches /etc/passwd and /etc/ssl/cert.pem.
-            Checked by verifying the event path starts with base + "/".
-        """
-        if not instruction.paths:
-            return (1, 0)
-
-        best: Optional[tuple[int, int]] = None
-
-        for pattern in instruction.paths:
-            if pattern == path:
-                return (4, len(path))
-
-            if pattern.endswith("/**"):
-                base = pattern.rsplit("/", maxsplit=1)[0]
-                if path.startswith(base + "/"):
-                    score = (2, len(base))
-                    if best is None or score > best:
-                        best = score
-
-            elif pattern.endswith(("/*", "/")):
-                base = pattern.rsplit("/", maxsplit=1)[0]
-                parent = path.rsplit("/", maxsplit=1)[0]
-                if parent == base:
-                    score = (3, len(base))
-                    if best is None or score > best:
-                        best = score
-
-        return best

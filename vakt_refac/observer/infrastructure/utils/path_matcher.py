@@ -99,7 +99,7 @@ def match_path(
     Priority levels (higher wins):
         6 - exact match:            /etc/settings.conf
         5 - segment wildcard:       /etc/settings* or /etc/*.conf
-        4 - deep glob with anchors: /etc/**settings.conf or /etc/**/*.conf
+        4 - deep glob with anchors: /etc/**/settings.conf or /etc/**/*.conf
         3 - non-recursive:          /etc/*
         2 - recursive:              /etc/**
         1 - global name/wildcard:   settings.conf or settings* or *.conf
@@ -142,7 +142,7 @@ def match_path(
             and "/" in pattern  # not a global name
             and not pattern.endswith("/*")  # not non-recursive pattern
         ):
-            # WildCard segment includes full size of pattern to to work properly.
+            # WildCard segment includes full size of pattern to work properly.
             # Thats why i used _match_glob()
             if _match_glob(pattern, path):
                 update((5, tiebreaker))
