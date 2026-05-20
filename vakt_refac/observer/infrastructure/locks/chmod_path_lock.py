@@ -15,7 +15,7 @@ class ChmodPathLock(BasePathLock):
     """
     Implementation of BasePathLock that supports multiple locking
     and provides exclusive and shared locking for file system objects by
-    renaming them to .vakt suffixed path and restricting permissions
+    renaming them to .vakt.lock suffixed path and restricting permissions
     via os.chmod().
 
     Why os.chmod() instead of fcntl.flock():
@@ -40,7 +40,7 @@ class ChmodPathLock(BasePathLock):
         releasing the lock, the next startup reconciles the log against actual
         disk state and restores every stale object to its original name and
         privileges. No external cleanup is required, the guarantee is built into the design.
-        Also that is the answer for why i renaming it with .vakt suffix (to mark them).
+        Also that is the answer for why i renaming it with .vakt.lock suffix (to mark them).
 
     Locking modes:
         - acquire():        Exclusive lock that sets permission to 000.
@@ -119,7 +119,7 @@ class ChmodPathLock(BasePathLock):
         """
         Acquires an exclusive lock on the object at the given path.
 
-        Renames the object to original_path.vakt and fully blocks
+        Renames the object to original_path.vakt.lock and fully blocks
         object with zero privileges to all type of users, that prevents
         all external processes from reading and writing.
         Persists the lock state to the registry before any file system
@@ -133,7 +133,7 @@ class ChmodPathLock(BasePathLock):
         """
         Acquires a shared lock on the object at the given path.
 
-        Renames the object to original_path.vakt and apples only read
+        Renames the object to original_path.vakt.lock and apples only read
         privileges to all type of users, that prevents writing from
         external processes. Intented for SnapshotsRegistryStore and create
         operations where read access must remain possible during processing.
@@ -153,7 +153,7 @@ class ChmodPathLock(BasePathLock):
         changes privileges of locked path to new privileges.
         """
         original_path = Path(path)
-        locked_path = original_path.with_suffix(".vakt")
+        locked_path = original_path.with_suffix(".vakt.lock")
         new_privileges = 0o444 if shared else 0o000
 
         if not original_path.exists():
@@ -176,12 +176,12 @@ class ChmodPathLock(BasePathLock):
         Releases the lock on the object at the given path.
 
         Recovers a concrete object recorded in the registry to the original state.
-        If path is not found in registry or original_path.vakt object does not exists,
+        If path is not found in registry or original_path.vakt.lock object does not exists,
         it means its already restored to original state.
         After recovery the updated registry persists immediately.
         Silently ignores if received path is not exist.
         """
-        locked_path = Path(path + ".vakt")
+        locked_path = Path(path + ".vakt.lock")
         if not self._registry or not locked_path.exists():
             return
 
@@ -201,7 +201,7 @@ class ChmodPathLock(BasePathLock):
 
         Called once after initializing and loading all locked path entries.
         Iterates the registry and for each locked path entry:
-            - If the .vakt object exists: restores privileges and
+            - If the .vakt.lock object exists: restores privileges and
                 renames it back to original.
             - If it does not exist: the object was already restored
                 so the stale entry is simply removes.
@@ -213,7 +213,7 @@ class ChmodPathLock(BasePathLock):
             return
 
         for original_path, original_privileges in self._registry.items():
-            locked_path = Path(original_path + ".vakt")
+            locked_path = Path(original_path + ".vakt.lock")
 
             if locked_path.exists():
                 chmod(locked_path, original_privileges)
