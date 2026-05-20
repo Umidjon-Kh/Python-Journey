@@ -160,8 +160,7 @@ class ChmodPathLock(BasePathLock):
             if locked_path.exists():
                 chmod(locked_path, new_privileges)
                 self._ignore_path([locked_path])
-            else:
-                return
+            return
 
         original_privileges = S_IMODE(stat(path).st_mode)
         self._registry[path] = original_privileges
