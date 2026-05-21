@@ -136,17 +136,27 @@ class GlobInstructionRegistry(BaseInstructionRegistry):
         return best if best is not None else self._default
 
     def show(self) -> Sequence[Instruction]:
-        """Returns all Instruction from the registry, not original only copy."""
-        return self._registry.copy()
+        """
+        Returns all registered Instruction objects.
+
+        The returned collections is the live internal registry.
+        Any direct modifications with snapshots must be applied to both
+        the domain registry and the raw registry to keep them in sync.
+        If you want to manage the entire registry, not the concrete object
+        use public methods (add/delete/clear) of InstructionRegistry.
+        """
+        return self._registry
 
     def show_raw(self) -> list[dict]:
         """
-        Returns the raw registry as a list of dicts, allowing upper layers
-        to display or serialize registry contents without manually
-        decomposing Instruction domain objects.
-        Also not original only copy.
+        Returns the raw registry as a list of dicts.
+
+        This gives upper layer objects a serialization-friendly view
+        without manually decomposing Instruction domain objects. The same
+        synchronization requirement applies: changes must be reflected
+        in both registries.
         """
-        return self._raw_registry.copy()
+        return self._raw_registry
 
     def delete(self, target: Any) -> None:
         """
