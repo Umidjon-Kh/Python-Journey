@@ -139,7 +139,7 @@ class GlobInstructionRegistry(BaseInstructionRegistry):
         """
         Returns all registered Instruction objects.
 
-        The returned collections is the live internal registry.
+        The returned collection is the live internal registry.
         Any direct modifications with snapshots must be applied to both
         the domain registry and the raw registry to keep them in sync.
         If you want to manage the entire registry, not the concrete object
