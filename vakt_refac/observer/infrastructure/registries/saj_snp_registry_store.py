@@ -67,7 +67,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
                 and automatically persists updated registry.
                 After successful completion, it sets processing to False back.
                 If the daemon crashes in the middle of a restore, processing remains True
-                fot that object. It means object is not restored completely, but temporary
+                for that object. It means object is not restored completely, but temporary
                 copy of object is remains in a file system.
                 On its next run, _recover_tumblers() checks the entire registry for any
                 path objects whose processing parameter is True and removes them all,
@@ -90,7 +90,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
                     one after successful completion. A missing completion log is a clear
                     signal that an operation did not finish cleanly.
                 - Not public internal operations that works in file system, logs a DEBUG
-                    entry to show what happened and what dont happened in internal operations.
+                    entry to show what happened and what doesn't happened in internal operations.
                 - All Validations are logs a WARNING entry if object did not pass validation.
 
             Live Monitoring:
@@ -177,7 +177,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
         to enable reading (without modifying) file system object while
         SAJSnapshotsRegistryStore processes with it.
         """
-        self._backup_dir: Path = Path(backup_dir)
+        self._backup_dir: Path = Path(backup_dir + "/.vakt.backups")
         self._registry_path: Path = Path(registry_path)
         self._registry: dict[str, list[Snapshot]] = {}
         self._raw_registry: dict[str, dict] = {}
@@ -297,7 +297,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
         """
         Restores the file system object at the given path to the state
         captured in the snapshot at the given index.
-        Acquires a shared lock during restore to block writes while restoring.
+        Acquires a lock during restore to block writes while restoring.
         Copies the backup to a temporary file first, verifies its checksum,
         then atomically replaces the target via os.replace().
         Logs a WARNING entry and returns if the path or index does not exist,
@@ -451,7 +451,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
         from previous crash. Called once on initialization after loading the
         registry. Any path with processing True flag indicates that the daemon is
         crashed during restore. The leftover .vakt.back file is removed and
-        rocessing flag is restored to False.
+        processing flag is restored to False.
         """
         self._log.debug(
             "(_recover_tumblers) start: checking %d paths", len(self._raw_registry)
@@ -475,7 +475,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
         snapshot backup. If validation fails, the snapshot is removed
         (via _remove() method from both registries and physical deletion).
         Then recursively validates the latest remaining snapshot for the path.
-        Returns None if no vaid snapshots remain.
+        Returns None if no valid snapshots remain.
         """
         self._log.debug("(_validate) start: path=%s index=%d", path, index)
 
@@ -553,7 +553,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
 
     def _load(self) -> None:
         """
-        Loads snapshots metadata form the JSON registry on disk.
+        Loads snapshots metadata from the JSON registry on disk.
         Silently skips if the file does not exist, Also ensure that
         the provided file is in valid format if it exists.
         """
@@ -588,7 +588,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
         """
         Configures a dedicated FileHandler that writes operation logs to
         saj_operations.log located next to the registry file. Returns the
-        configured logger instance. Logger - does not responsible for rotation
+        configured logger instance. Logger is not responsible for rotation
         and other external log managament things.!
         """
         log_path = self._registry_path.parent / self._LOG_FILENAME
