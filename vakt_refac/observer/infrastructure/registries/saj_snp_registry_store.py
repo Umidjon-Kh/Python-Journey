@@ -170,7 +170,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
     ) -> None:
         """
         Initializes the store, configures the operation journal, loads persisted
-        snapshots metadata form disk if the registry file exists and its a JSON type
+        snapshots metadata from disk if the registry file exists and its a JSON type
         file with valid format of data and recovers any incomplete operations leftovers
         via the tumbler flag. Also initializes BasePathLock implementation methods, if
         implementation has acquire_shared() method uses it instead of simple acquire()
@@ -299,12 +299,12 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
         captured in the snapshot at the given index.
         Acquires a shared lock during restore to block writes while restoring.
         Copies the backup to a temporary file first, verifies its checksum,
-        then atomatically replaces the target via os.replace().
+        then atomically replaces the target via os.replace().
         Logs a WARNING entry and returns if the path or index does not exist,
         or if there are no valid snapshots exist for path.
         """
 
-        self._log.warning("(restore) start: path=%s index=%d", path, index)
+        self._log.info("(restore) start: path=%s index=%d", path, index)
 
         snapshot = self.get(path, index)
 
@@ -324,7 +324,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
             copy2(snapshot.backup_path, tmp_path)
 
             if checksum(str(tmp_path)) != snapshot.checksum:
-                self._log.info("(restore) fail: checksum mismatch path=%s", path)
+                self._log.warning("(restore) fail: checksum mismatch path=%s", path)
                 tmp_path.unlink(missing_ok=True)
                 self._raw_registry[path]["processing"] = False
                 self._save()
@@ -342,13 +342,13 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
     def delete(self, path: str, index: int) -> None:
         """
         Removes the Snapshot at the given index from both registries and
-        deletes its pysical backup object from disk.
+        deletes its physical backup object from disk.
         Logs a WARNING entry and returns if the path or index does not exist.
         """
         self._log.info("(delete) start: path=%s index=%d", path, index)
 
         if not self._registry:
-            self._log.warning("(delete) skip: registry is empty"
+            self._log.warning("(delete) skip: registry is empty")
             return
 
         snapshots = self._registry.get(path)
@@ -361,7 +361,9 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
             real_index = index if index >= 0 else len(snapshots) + index
             snapshot = snapshots[real_index]
         except IndexError:
-            self._log.warning("(delete) skip: index out of range path=%s index=%d", path, index)
+            self._log.warning(
+                "(delete) skip: index out of range path=%s index=%d", path, index
+            )
             return
 
         Path(snapshot.backup_path).unlink(missing_ok=True)
@@ -447,7 +449,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
         """
         Detects and cleans up incomplete restore operations leftovers
         from previous crash. Called once on initialization after loading the
-        registry. Any path with processing True flag inidicates that the daemon is
+        registry. Any path with processing True flag indicates that the daemon is
         crashed during restore. The leftover .vakt.back file is removed and
         rocessing flag is restored to False.
         """
