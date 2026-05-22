@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -41,10 +40,12 @@ class EventContext:
             the current event. Used together with processed_handlers to
             determine loop termination.
         - performed: a sequence of InstructionType values that represent completed
-        actions. Used by specific handlers that depend on completion of
-        certain actions before they can proceed. For example State Depended
-        handlers that trigger only when specific actions have been performed
-        by other handlers.
+            actions. Used by specific handlers that depend on completion of
+            certain actions before they can proceed. For example State Depended
+            handlers that trigger only when specific actions have been performed
+            by other handlers.
+        - metadata: an open key-value buffer for inter-handler communication.
+            Handlers may read and write arbitrary data keyed by any hashable value.
 
     Why performed uses InstructionType and not str:
         Using InstructionType provides type safety, IDE autocompletion and
@@ -60,18 +61,22 @@ class EventContext:
         different questions with different consumers.
 
     Attributes:
-        - event:               The Event instance currently being processed.
-        - instruction:         The Instruction associated with the current event.
-                                Defines what actions should be performed.
-        - snapshot:            Optional Snapshot created by a backup operation.
-                                Set by Backuper-like handlers after creating a backup.
-        - processed_handlers:  Counter of non-phantom handlers that have completed
-                                their work for this event.
-        - handlers_count:      Total number of handlers expected to process this event.
-                                Decremented by phantom handlers and skipping handlers.
-        - performed:                Sequence of InstructionType values representing
-                                completed actions. Used by phantom handlers for
-                                monitoring and auditing purposes.
+        - event:              The Event instance currently being processed.
+        - instruction:        The Instruction associated with the current event.
+                                   Defines what actions should be performed.
+        - snapshot:           Optional Snapshot created by a backup operation.
+                                   Set by Backuper-like handlers after creating a backup.
+        - processed_handlers: Counter of non-phantom handlers that have completed
+                                   their work for this event.
+        - handlers_count:     Total number of handlers expected to process this event.
+                                   Decremented by phantom handlers and skipping handlers.
+        - performed:          Sequence of InstructionType values representing
+                                   completed actions. Used by phantom handlers for
+                                   monitoring and auditing purposes.
+        - metadata:           Open key-value buffer for inter-handler communication and
+                                   temporary per-event state storage. Handlers may
+                                   use their class name as a key, a hash for
+                                   private communication or any other hashable key.
 
     Notes:
         - EventContext does not implement any business logic or decision-making.
@@ -83,6 +88,10 @@ class EventContext:
         - Phantom handlers must decrement handlers_count on first contact to
             avoid infinite loop caused by multiple phantom handlers waiting
             for each other to finish.
+        - metadata is an open playground. Handlers are responsible for defining
+            their own key conventions. No schema is enforced by EventContext.
+            All data stored in metadata is ephemeral and exists only during
+            the lifecycle of a single event.
     """
 
     event: Event
@@ -90,4 +99,5 @@ class EventContext:
     snapshot: Optional[Snapshot] = None
     processed_handlers: int = 0
     handlers_count: int = 0
-    performed: Sequence[InstructionType] = field(default_factory=list)
+    performed: list[InstructionType] = field(default_factory=list)
+    metadata: dict = field(default_factory=dict, init=False)
