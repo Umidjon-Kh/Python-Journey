@@ -32,20 +32,20 @@ _LEVEL_MAP = {
 
 class SysLogger(BaseHandler):
     """
-    Phatom handler responsible for logging EventContext state changes
+    Phantom handler responsible for logging EventContext state changes
     to a file throughout the handler loop lifecycle.
 
     SysLogger is a phantom handler - it does not perform any action on
     the file system and never increments processed_handlers. Instead it
     observes EventContext state on every iteration and logs when
-    somethiing changes, providing a continuos audit trail of what happened during
+    something changes, providing a continiuos audit trail of what happened during
     event processing.
 
     Why phantom handler decrements handlers_count on first contact:
         If multiple phantom handlers are registered they would wait for each
-        other to complete indefinetely since none of them increments
+        other to complete indefinitely since none of them increments
         processed_handlers. By decrementing handlers_count once on first
-        contact, a phantom handler becomes invisible to other phantmo handlers
+        contact, a phantom handler becomes invisible to other phantom handlers
         and the loop can terminate correctly.
 
     Why _last_ctx is compared on every can_handle call:
@@ -56,7 +56,7 @@ class SysLogger(BaseHandler):
 
     Why _last_ctx and _excluded reset when is_done returns True:
         EventContext is ephemeral - it exists only for single event. Without
-        reset, the next  event's context would be compared agains the previous
+        reset, the next  event's context would be compared against the previous
         event's state producing incorrect can_handle results.
 
     Why logging level comes from instruction.level:
@@ -92,7 +92,7 @@ class SysLogger(BaseHandler):
 
     def __init__(self) -> None:
         """
-        Initializws all attributes of handler and confirues a dedicated FileHandler
+        Initializes all attributes of handler and configures a dedicated FileHandler
         that writes logs to the common storage space of daemon VAKT_SANCTUM.
         """
         self._last_ctx: Optional[EventContext] = None
@@ -110,7 +110,7 @@ class SysLogger(BaseHandler):
             ctx.handlers_count -= 1
             self._excluded = True
 
-        if InstructionType.LOG not in ctx.performed:
+        if ctx.instruction.types and InstructionType.LOG not in ctx.instruction.types:
             return False
 
         if self._last_ctx is None:
