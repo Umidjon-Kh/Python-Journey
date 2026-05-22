@@ -96,7 +96,7 @@ class ChmodPathLock(BasePathLock):
         - replace() is atomic at the kernel level. A directory of
             any size is replaced in O(1) without copying its contents.
         - All methods that modifies or touchs a file system object automatically
-            informs Dispatcher about it using self._ignore_paths() method.
+            informs Dispatcher about it using self._register_ignore() method.
     """
 
     _DEFAULT_VAULT = "/var/lib/.vakt"
@@ -159,7 +159,7 @@ class ChmodPathLock(BasePathLock):
         if not original_path.exists():
             if locked_path.exists():
                 chmod(locked_path, new_privileges)
-                self._ignore_path([locked_path])
+                self._register_ignore([locked_path])
             return
 
         original_privileges = S_IMODE(stat(path).st_mode)
@@ -169,7 +169,7 @@ class ChmodPathLock(BasePathLock):
         replace(original_path, locked_path)
         chmod(locked_path, new_privileges)
 
-        self._ignore_path([locked_path, original_path])
+        self._register_ignore([locked_path, original_path])
 
     def release(self, path: str) -> None:
         """
@@ -190,7 +190,7 @@ class ChmodPathLock(BasePathLock):
         if original_privileges != -1:
             chmod(locked_path, original_privileges)
             replace(locked_path, path)
-            self._ignore_path([locked_path, path])
+            self._register_ignore([locked_path, path])
 
         self._registry.pop(path, None)
         self._save()
@@ -218,7 +218,7 @@ class ChmodPathLock(BasePathLock):
             if locked_path.exists():
                 chmod(locked_path, original_privileges)
                 replace(locked_path, original_path)
-                self._ignore_path([locked_path, original_path])
+                self._register_ignore([locked_path, original_path])
 
         self._registry.clear()
         self._save()
@@ -254,14 +254,19 @@ class ChmodPathLock(BasePathLock):
         with open(self._registry_path, encoding="utf-8") as file:
             self._registry = load(file)
 
-    def _ignore_path(self, paths: Sequence[Union[str, Path]]) -> None:
+    def _register_ignore(self, paths: Sequence[Union[str, Path]]) -> None:
         """
-        Walks the call stack to find object that has a "ignoring_paths"
-        attribute (typically the handler that called the lock) and appends
-        that sequence of attribute with received paths sequence from modified
-        method. Intended to inform Dispatcher to temporarily ignore the affected
-        paths. This prevents the Dispatcher from processing events caused
-        by daemon infrastructure own modifications.
+        Walks the call stack to locate the first object that owns an ignoring_paths
+        dict (typically the handler that invoked the lock) and increments the
+        suppress counter for each affected path by one.
+
+        Each call accumulates independently: if the same path is registered
+        multiple times across separate operations, Dispatcher will suppress
+        exactly that many incoming events for it, preventing under-ignoring
+        when a single handler performs several modifications on the same object.
+
+        Silently does nothing if no object with ignoring_paths is found in
+        the call stack.
         """
         frame = _getframe(2)
 
@@ -273,6 +278,9 @@ class ChmodPathLock(BasePathLock):
                 and obj.ignoring_paths is not None
             ):
                 for path in paths:
-                    obj.ignoring_paths.append(str(path))
+                    str_path = str(path)
+                    obj.ignoring_paths[str_path] = (
+                        obj.ignoring_paths.get(str_path, 0) + 1
+                    )
                 break
             frame = frame.f_back
