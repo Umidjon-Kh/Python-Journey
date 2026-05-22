@@ -23,12 +23,21 @@ class Dispatcher:
     no handlers can make further progress.
 
     Ignoring Mechanism:
-        Dispatcher maintains a shared ignoring_paths sequence that is injected
+        Dispatcher maintains a shared ignoring_paths dict[str, int] that is injected
         into all handlers that opt into the mechanism by setting their ignoring_paths
-        attribute to an empty sequence instead of None. When handlers adds a path to
-        ignoring_paths, Dispatcher will skip and discard any incoming Event with that path
-        from the buffer that enables to ignore changes that processed with handlers via
-        giving knowledge to Dispatcher and any type of handlers by shared sequence.
+        attribute to an empty dict instead of None. Each key is an absolute path and
+        its value is the number of incoming events to suppress for that path.
+        When a handler adds a path, Dispatcher decrements its counter on each matching
+        incoming event and removes the entry once the counter reaches zero.
+        This allows handlers to register exactly how many self-generated events
+        to suppress per path, preventing Dispatcher from reacting to its own
+        file system modifications without over-ignoring future external events.
+
+    Why dict[str, int] instead of list[str] for ignoring_paths:
+        A list collapses duplicate paths into a single ignore, causing Dispatcher
+        to under-ignore when multiple handlers modify the same path independently.
+        A counter-based dict tracks exactly how many events to suppress per path,
+        preserving correctness when several handlers operate on the same object.
 
     Handlers Loop:
         Dispatcher iterates over all handlers in a loop on every Event.
@@ -73,7 +82,7 @@ class Dispatcher:
         self._buffer: Queue[Event] = buffer
         self._instruction_registry: BaseInstructionRegistry = instruction_registry
         self._handlers: Sequence[BaseHandler] = handlers
-        self._ignoring_paths: list[str] = []
+        self._ignoring_paths: dict[str, int] = {}
         self._shutdown_event: ShutdownEvent = shutdown_event
         self._thread: Thread = Thread(target=self._run, daemon=True, name="dispatcher")
 
@@ -105,7 +114,11 @@ class Dispatcher:
                 continue
 
             if event.path in self._ignoring_paths:
-                self._ignoring_paths.remove(event.path)
+                if self._ignoring_paths[event.path] <= 1:
+                    del self._ignoring_paths[event.path]
+                else:
+                    self._ignoring_paths[event.path] -= 1
+
                 self._buffer.task_done()
                 continue
 

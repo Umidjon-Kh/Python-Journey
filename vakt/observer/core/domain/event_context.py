@@ -99,5 +99,5 @@ class EventContext:
     snapshot: Optional[Snapshot] = None
     processed_handlers: int = 0
     handlers_count: int = 0
-    performed: list[InstructionType] = field(default_factory=list)
+    performed: list[InstructionType] = field(default_factory=list, init=False)
     metadata: dict = field(default_factory=dict, init=False)
