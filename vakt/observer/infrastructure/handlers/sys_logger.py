@@ -14,8 +14,6 @@ from os import environ
 from pathlib import Path
 from typing import Optional
 
-from vakt.observer.core.ports import handler
-
 from ...core import (
     BaseHandler,
     EventContext,
