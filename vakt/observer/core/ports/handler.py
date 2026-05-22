@@ -57,13 +57,17 @@ class BaseHandler(ABC):
         depending on specific handler implementations.
 
     Ignoring Paths Mechanism:
-        ignoring_paths is an optional shared sequence provided by Dispatcher on
+        ignoring_paths is an optional shared dict[str, int] provided by Dispatcher on
         initialization. If a handler needs to prevent Dispatcher from processing
         specific paths (for example while RollBacker is restoring a file), it must
-        set ignoring_paths to an empty list instead of None to signal Dispatcher
+        set ignoring_paths to an empty dict instead of None to signal Dispatcher
         that this handler wants to participate in the path ignoring mechanism.
-        Dispatcher will then inject the shared ignoring_paths list into this handler.
+        Dispatcher will then inject the shared ignoring_paths dict into this handler.
+        Each key is an absolute path and its value is the number of incoming events
+        to suppress for that path. When the counter reaches zero the path is removed
+        from the dict automatically by Dispatcher.
         Handlers that do not need this mechanism should leave ignoring_paths as None.
+
 
     Implementations Example:
         - Logger:     phantom handler that logs EventContext state changes.
@@ -80,12 +84,12 @@ class BaseHandler(ABC):
         - Handler does not contain any storage or external state by default.
             If implementation requires it, it must be provided via __init__.
         - If handler uses Ignoring Paths Mechanism, the SnapshotsRegistryStore
-            and PathLock instances are injected automaticcaly, without any
+            and PathLock instances are injected automatically, without any
             request from the handlers. So verify that the handler's "__init__"
             method accepts these arguments.
     """
 
-    ignoring_paths: Optional[list[str]] = None
+    ignoring_paths: Optional[dict[str, int]] = None
 
     @abstractmethod
     def can_handle(self, ctx: EventContext) -> bool:
