@@ -46,6 +46,9 @@ class BaseInstructionRegistry(ABC):
             by Dispatcher which operates in a single thread and does not modifify registry.
         - All implementations not requires to respect graceful shutdown as it is
             responsibility of upper layer objects (Threads).
+        - BaseInstructionRegistry does not have an __init__ method
+            because some inheritors  may require explicitly passing the path to
+            registry, while others rely on values set within a specific implementation.
     """
 
     @abstractmethod
