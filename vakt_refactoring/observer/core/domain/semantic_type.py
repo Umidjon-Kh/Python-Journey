@@ -41,7 +41,7 @@ class SemanticType(str, metaclass=SemanticTypesMeta):
     """
     Base class for all semantic domain types in the pipeline.
 
-    SemanticType uses a custom metclass instead of StrEnum to allow
+    SemanticType uses a custom metaclass instead of StrEnum to allow
     subclassing for domain-specific type extensions. It serves as the
     foundation for EventType, InstructionType, LevelType and any other
     semantic classification types in the system.
@@ -50,11 +50,11 @@ class SemanticType(str, metaclass=SemanticTypesMeta):
         StrEnum in Python does not allow subclassing once members are defined.
         Since all semantic types in this project are designed to be extended
         by platform-specific or custom implementations, using StrEnum would
-        prevent this extensibiliyty entirely.
+        prevent this extensibility entirely.
 
     Why metaclass approach:
-        SemanticTypesMeat automatically wraps all uppercase string constants
-        into Semanticype instances at class creation time. This means:
+        SemanticTypesMeta automatically wraps all uppercase string constants
+        into SemanticType instances at class creation time. This means:
             - isinstance(EventType.FILE_CREATED, EventType) -> True.
             - isinstance(InotifyEventType.FILE_ACCESSED, InotifyEventType) -> True.
             - isinstance(InstructionType.BACKUP, InstructionType) -> True.
@@ -65,7 +65,7 @@ class SemanticType(str, metaclass=SemanticTypesMeta):
         - SemanticType is a str subclass so it is fully compatible with
             plain string comparisons and operations.
         - Subclasses automatically inherit this behavior through
-            SemantictypesMeta without any additional configurations.
+            SemanticTypesMeta without any additional configurations.
         - Do not add members to SemanticType directly - create
             domain-specific subclass for each semantic category.
     """

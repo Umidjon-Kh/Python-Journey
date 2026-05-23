@@ -28,12 +28,12 @@ class CrossPlatformEventType(EventType):
     Cross-platfrom file system event types.
 
     Defines the minimal, conservative set of file system events that can
-    be reliably obsrved across different operating system and file system
+    be reliably observed across different operating system and file system
     implementations. This is the default EventType implementation that
     should be used by all cross-platform components.
 
     Why conservative:
-        This abstraction intentionally excludes platfrom-specific or
+        This abstraction intentionally excludes platform-specific or
         inconsistently supported events such as file open, access, or
         certain metadata changes in order to provide a stable and portable
         contract for consumers regardless of the underlying platform.
@@ -42,7 +42,7 @@ class CrossPlatformEventType(EventType):
         For platform-specific semantics create a subclass of EventType:
             - InotifyEventType: Linux inotify specific events
             - FanotifyEventType: Linux fanotify specific events
-            - WindowsEventType: Windows specific evenst
+            - WindowsEventType: Windows specific events
 
         Such extensions are not automatically supported by the core
         processing pipeline. Consumers introducing custom event types
@@ -50,8 +50,8 @@ class CrossPlatformEventType(EventType):
         recognize and handle those extended semnatics.
 
     Notes:
-        - All values are lowercae strings for human readability.
-        - File and directory events are seperated for semantic clarity.
+        - All values are lowercase strings for human readability.
+        - File and directory events are separated for semantic clarity.
     """
 
     # File events
