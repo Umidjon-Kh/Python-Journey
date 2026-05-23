@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
+from queue import Queue
+from threading import Event as ShutdownEvent
+
+from ..domain import Event
 
 
 class BaseWatcher(ABC):
@@ -8,7 +13,7 @@ class BaseWatcher(ABC):
     Abstract base class for all file system watchers.
 
     A Watcher is responsible for observing file system changes
-    and producing Event objects. It has not knowledge of what happens
+    and producing Event objects. It has no knowledge of what happens
     to event after they are placed into the buffer - that is the
     responsibility of the Dispatcher layer objects.
 
@@ -35,17 +40,38 @@ class BaseWatcher(ABC):
         Mixing both into start() would create unnecessary noise and make
         it harder to understand the lifecycle of the watcher.
 
+    Why BaseWatcher require the __init__ method to adhere to the contract:
+        Because all implementations require the same parameters.
+        This is intentional, as the key parameters considered strictly
+        necessary are: shutdown_event, thread-safe buffer and paths_to_observe.
+        This is done to preserve the open/closed principle without changing
+        the initial setup (bootstrap), when creating a new implementation.
+
     Notes:
         - Watcher runs in its own thread (Watcher Thread).
         - It must respect shutdown_event to stop gracefully.
         - It must never block indefinitely without checking shutdown_event.
         - Watcher has no knowledge of what to subscribe to - it only
-            subscribes to provided paths. Providing those path is the
+            subscribes to provided paths. Providing those paths is the
             responsibility of the bootstrap or any upper layer object.
-        - Buffer and shutdown_event are provided via __init__ of the
-            implementation. BaseWatcher does not enforce this contract
-            because each implementation may require different parameters.
     """
+
+    @abstractmethod
+    def __init__(
+        self,
+        shutdown_event: ShutdownEvent,
+        buffer: Queue[Event],
+        paths_to_observe: Sequence[str],
+    ) -> None:
+        """
+        Initializes all attributes of the watcher instance.
+
+        Args:
+            paths: Sequence of absolute paths to watch.
+            buffer: Thread-safe buffer to put Events into.
+            shutdown_event: Flag to stop the watcher gracefully if system asks for it.
+        """
+        ...
 
     @abstractmethod
     def start(self) -> None:
