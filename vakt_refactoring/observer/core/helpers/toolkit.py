@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..helpers import BasePathLocker, BaseSnapshotsRegistryStore
+from .path_locker import BasePathLocker
+from .snapshots_registry_store import BaseSnapshotsRegistryStore
 
 
 @dataclass(slots=True, frozen=True)
@@ -20,10 +21,15 @@ class ToolKit:
         Its references must not change at runtime to guarantee consistency
         across all handlers that share the same instance.
 
-    Why domain object and not a plain dict:
+    Why not a domain object:
         ToolKit participates in Bootstrap assembly and is accepted by
-        BaseHandler as a typed contract. A plain dict would lose type
-        safety, IDE autocompletion and semantic clarity.
+        BaseHandler as a typed contract, but the ToolKit object itself does
+        not participate in the daemon's pipeline and is used only with the
+        handlers themselves.
+
+    Why a typed container and not a plain dict:
+        A plain dict would lose type safety,
+        IDE autocompletion and semantic clarity.
 
     Why all handlers receive ToolKit even if they don't need it:
         Bootstrap operates only on abstractions and does not know which

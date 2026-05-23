@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 
-class BasePathLock(ABC):
+class BasePathLocker(ABC):
     """
     Abstract base class for file system level locking.
 
