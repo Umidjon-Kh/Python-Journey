@@ -13,7 +13,7 @@ class EventType(SemanticType):
     EventType serves as the common ancestor for all event type
     implementations both cross-platform and platform-specific.
     It enables type annotations that accept any event type regardless
-    of the underlying platfrom or kernel subsystem/
+    of the underlying platfrom or kernel subsystem.
 
     Subclass this to create platfrom-specific event types:
         - CrossPlatformEventType: cross-platform events
