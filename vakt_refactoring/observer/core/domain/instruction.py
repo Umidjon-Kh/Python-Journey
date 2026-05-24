@@ -61,7 +61,7 @@ class InstructionType(SemanticType):
     For example:
         - LOG:    record the event via Logger handler
         - BACKUP: create a snapshot via BackupInvoker handler
-        - NOTIFY: notify the user via Notifier handler
+        - ALERT: alerts the user via Alerter
 
     Why not StrEnum:
         SemanticType is used instead of StrEnum to allow subclassing
@@ -86,7 +86,7 @@ class InstructionType(SemanticType):
 
     LOG = "log"
     BACKUP = "backup"
-    NOTIFY = "notify"
+    ALERT = "alert"
 
 
 @dataclass(slots=True, frozen=True)
