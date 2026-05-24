@@ -9,7 +9,7 @@ from .instruction import Instruction, InstructionType
 @dataclass(slots=True)
 class EventContext:
     """
-    A mutable dispatcher-layer object that represents the processing context
+    A mutable processing-layer object that represents the processing context
     of a single file system change.
 
     EventContext is instantiated by the Dispatcher after an event is retrieved
@@ -107,7 +107,7 @@ class EventContext:
 
     event: Event
     instruction: Instruction
+    handlers_count: int
     processed_handlers: int = 0
-    handlers_count: int = 0
     performed: list[InstructionType] = field(default_factory=list, init=False)
     metadata: dict = field(default_factory=dict, init=False)

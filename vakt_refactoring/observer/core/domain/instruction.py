@@ -10,7 +10,7 @@ from .semantic_type import SemanticType
 
 class LevelType(SemanticType):
     """
-    Dispatcher-layer semantic classification label used to mark
+    Processing-layer semantic classification label used to mark
     the severity level of a file system object change.
     It does not perform any evaluation or decision-making on its own.
 
@@ -92,7 +92,7 @@ class InstructionType(SemanticType):
 @dataclass(slots=True, frozen=True)
 class Instruction:
     """
-    An immutable dispatcher-layer object that represents a pre-defined
+    An immutable processing-layer object that represents a pre-defined
     behavioral contract for a specific class of file system events.
 
     An Instruction is not created in response to a single event -
