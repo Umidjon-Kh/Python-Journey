@@ -19,8 +19,8 @@ class InfraContainer:
 
     InfraContainer acts as a postman - it does not create, manage
     or instantiate anything. It simply carries registered implementations
-    and makes them available to upper layer objects such as Bootstrap
-    or external management tools that need to know what is available.
+    and makes them available to any client that needs to know what
+    implementations are available.
 
     How it works:
         A developer creates a concrete implementation of any core port
@@ -28,9 +28,10 @@ class InfraContainer:
         sequence directly in this file. No instantiation, no passing
         objects around - just a class reference placed in the right list.
 
-        Bootstrap or any upper layer object then reads from InfraContainer
-        and picks the implementation it needs, instantiating it with
-        the correct parameters during the assembly phase.
+        Any client such as a GUI, CLI or external management tool reads
+        from InfraContainer directly, picks the implementations it needs
+        and passes the chosen selection to Bootstrap as its environment
+        for the assembly phase.
 
     Why a plain class and not a dataclass or instance:
         InfraContainer is not meant to be instantiated. It is a
@@ -47,8 +48,9 @@ class InfraContainer:
 
     Notes:
         - InfraContainer does not validate implementations.
-            It is the responsibility of the upper layer objects
-            to ensure that chosen implementations are compatible.
+            It is the responsibility of the client to ensure that
+            chosen implementations are compatible before passing
+            them to Bootstrap.
         - All sequences are empty by default. Developers add
             their implementations by importing and placing them
             in the corresponding sequence in this file.
