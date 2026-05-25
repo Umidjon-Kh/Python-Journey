@@ -158,7 +158,7 @@ class SysLogger(BaseHandler):
     def _setup_logger(self) -> Logger:
         """
         Configures a dedicated FileHandler that writes all performed
-        operations to the EventContext. Uses a common storage of daemon
+        operations to the log file. Uses a common storage of daemon
         VAKT_SANCTUM to write logs. Also SysLogger is not responsible for
         rotation and other external log management operations.
         Returns the configured Logger instance.

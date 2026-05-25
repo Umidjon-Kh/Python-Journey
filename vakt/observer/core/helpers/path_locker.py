@@ -16,7 +16,7 @@ class BasePathLocker(ABC):
     PathLocker is a helper infrastructure component designed to assist
     handlers and developers that require safe interaction with file system
     objects during critical operations. It is not a core pipeline element
-    and does not participate in event processing directly
+    and does not participate in event processing directly.
 
     Implementations Example:
         - FcntlPathLocker: Linux/macOS, uses fcntl.flock().

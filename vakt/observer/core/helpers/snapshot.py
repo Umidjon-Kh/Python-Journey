@@ -28,7 +28,7 @@ class Snapshot:
                             Used by a specific roll backing components to know where
                             to restore the object. Also used as a key in registry.
 
-        - backup_path:   Absolute path were the backup copy is stored.
+        - backup_path:   Absolute path where the backup copy is stored.
                             Also used by a specific components to know where is
                             the backup.
         - checksum:      SHA-256 hash of backup file system object.

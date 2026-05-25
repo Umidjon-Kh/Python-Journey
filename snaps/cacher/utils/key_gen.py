@@ -61,7 +61,7 @@ def generate_template_key(
     """
     Generates a cache key from a user-provided template string.
     Template is formatted using bound function arguments so both
-    positional and keyword arguments are available by parameter name.
+    positional and keyword arguments available by parameter name.
 
     Example:
         @snap(key="user-{user_id}")

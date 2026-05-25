@@ -43,7 +43,7 @@ class BaseInstructionRegistry(ABC):
         - add(), delete(), clear(), show() are intended only for external
             management utilities and bootstrap configuration.
         - By default does not require thread-safety as it is only used
-            by Dispatcher which operates in a single thread and does not modifify registry.
+            by Dispatcher which operates in a single thread and does not modify registry.
         - All implementations not requires to respect graceful shutdown as it is
             responsibility of upper layer objects (Threads).
         - BaseInstructionRegistry does not have an __init__ method

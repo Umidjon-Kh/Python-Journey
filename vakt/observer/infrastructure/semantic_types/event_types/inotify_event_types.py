@@ -5,12 +5,12 @@ from ....core import EventType
 
 class InotifyEventType(EventType):
     """
-    File system event types for the lInux inotify kernel subsystem.
+    File system event types for the Linux inotify kernel subsystem.
 
-    Provides the complete event set observable via via inotify including
-    higher-fidelity events not avialable on other platforms such as
+    Provides the complete event set observable via inotify including
+    higher-fidelity events not available on other platforms such as
     FILE_CLOSED_WRITE which fires once after a file is fully written and
-    closed - eliminaiting noise of intermediate write events that
+    closed - eliminating noise of intermediate write events that
     FILE_MODIFIED would produce on every partial write.
 
     Notes:

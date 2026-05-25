@@ -156,7 +156,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
             with empty string fields so the calling handler or other upper layer objects
             can detect the failure by checking it, without raising exceptions
             that could crash the Dispatcher.
-        - All methods log their before and after processing. if you ant to remove
+        - All methods log their before and after processing. if you want to remove
             unnecessary noise from the internal method logs, you can process
             only necessary logs by filtering them using external management tools.
             For example you can filter by semantic name of the method prefix, adding

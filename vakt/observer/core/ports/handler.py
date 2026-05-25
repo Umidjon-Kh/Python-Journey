@@ -37,7 +37,7 @@ class BaseHandler(ABC):
             Decrements handlers_count if it cannot process the current event.
             Example: BackupInvoker that calls create() method from SnapshotsRegistryStore
             implementation, or others: RestoreInvoker, AntiMutator.
-            Note: Invokers depends on sate of Instruction.types that can be managed
+            Note: Invokers depends on state of Instruction.types that can be managed
                 with ResponseCollectors or other handler implementations that modifies
                 instruction.types sequence.
 
@@ -45,16 +45,16 @@ class BaseHandler(ABC):
             by other handlers. Uses ctx.performed to check if required actions
             are completed before proceeding.
             Example: SnapshotsRotator that triggers only file system object has
-                beed backed up
+                been backed up
 
-        - EndRunner: trggers only after all non-phantom handlers have completed
+        - EndRunner: triggers only after all non-phantom handlers have completed
             their work. Similar to phantom handler but runs only once at the end.
             Example: Reporter that send a final report after all actions are done.
 
     Performed Actions:
         After completing a specific action, handlers should append the corresponding
         InstructionType to ctx.performed. This enables State Depended handlers and
-        phantom handlers monitor what actions have beed performed without
+        phantom handlers monitor what actions have been performed without
         depending on specific handler implementations.
 
     Why BaseHandler require the __init__ method to adhere the contract and
@@ -85,7 +85,7 @@ class BaseHandler(ABC):
 
     Ignoring Paths Mechanism:
         ignoring_paths is an attribute of the ToolKit shared dictionary (dict[str, int]).
-        It is used to ensure that the handles adds (or increments) a counter to this
+        It is used to ensure that the handler adds (or increments) a counter to this
         dictionary each time it interacts with file system object: path: count,
         where count is the number of interactions.
 
