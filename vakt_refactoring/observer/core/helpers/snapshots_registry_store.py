@@ -12,6 +12,11 @@ class BaseSnapshotsRegistryStore(ABC):
     """
     Abstract base class for snapshots registry and storage.
 
+    SnapshotsRegistryStore is a helper infrastructure component designed
+    to assist handlers that require backup and restore capabilities for
+    file system objects. It is not a core pipeline element and does not
+    participate in event processing directly
+
     SnapshotsRegistryStore is responsible for two things at once:
         1. Registry - stores and manages Snapshot metadata objects
             grouped by original path.
@@ -42,10 +47,6 @@ class BaseSnapshotsRegistryStore(ABC):
             - Persist registry immediately after every modification.
             - Use atomic write operations where possible to avoid corrupted
                 registry files on crash during write.
-
-        Graceful shutdown is handled by upper layer objects like Dispatcher.
-        But it does not mean handlers do not require to respect graceful
-        shutdown - some handlers may require it.
 
     Implementations Example:
         - DiskSnapshotsRegistryStore: stores backups on disk, registry in JSON.
