@@ -15,7 +15,7 @@ class BaseSnapshotsRegistryStore(ABC):
     SnapshotsRegistryStore is a helper infrastructure component designed
     to assist handlers that require backup and restore capabilities for
     file system objects. It is not a core pipeline element and does not
-    participate in event processing directly
+    participate in event processing directly.
 
     SnapshotsRegistryStore is responsible for two things at once:
         1. Registry - stores and manages Snapshot metadata objects
@@ -35,6 +35,19 @@ class BaseSnapshotsRegistryStore(ABC):
     Snapshots are accessed by index (snapshot_N) where N is the position
     in the history sequence. The latest snapshot is always at index -1.
 
+    Why ignoring_paths is a required attribute:
+        Every SnapshotsRegistryStore implementation interacts with the file
+        system directly during create() and restore() operations. These
+        interactions produce file system events that the Watcher will capture
+        and the Dispatcher will process as external changes - creating noise
+        and potentially incorrect state transitions.
+
+        To prevent this, every implementation must register affected paths
+        into ignoring_paths so the Dispatcher suppresses those self-generated
+        events. ignoring_paths is injected by Bootstrap after assembly and
+        is a non-optional dependency - every implementation is expected to
+        use it whenever it touches the file system.
+
     Persistence Requirements:
         All implementations MUST persist the registry after every modification
         (create, delete, clear, clear_all) to prevent metadata loss on crash.
@@ -47,6 +60,9 @@ class BaseSnapshotsRegistryStore(ABC):
             - Persist registry immediately after every modification.
             - Use atomic write operations where possible to avoid corrupted
                 registry files on crash during write.
+            - Register all affected paths into ignoring_paths before and
+                after every file system operation to suppress self-generated
+                events from reaching the Dispatcher.
 
     Implementations Example:
         - DiskSnapshotsRegistryStore: stores backups on disk, registry in JSON.
@@ -59,10 +75,14 @@ class BaseSnapshotsRegistryStore(ABC):
         - By default does not require thread-safety as it is only used by handlers
             that operate in the Dispatcher layer.
         - The BaseSnapshotsRegistryStore does not have an __init__ method
-            because some inheritors  may require explicitly passing the path to
+            because some inheritors may require explicitly passing the path to
             the backup and registry, while others rely on values set within a
             specific implementation.
+        - ignoring_paths is injected by Bootstrap after assembly via:
+            snapshots_registry.ignoring_paths = toolkit.ignoring_paths
     """
+
+    ignoring_paths: dict[str, int]
 
     @abstractmethod
     def create(self, event: Event) -> Snapshot:

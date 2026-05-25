@@ -273,7 +273,7 @@ class ChmodPathLocker(BasePathLocker):
         Silently does nothing if no object with ignoring_paths is found in
         the call stack.
         """
-        frame = _getframe(2)
+        frame = _getframe(1)
 
         while frame:
             for obj in frame.f_locals.values():
