@@ -67,9 +67,9 @@ class BaseWatcher(ABC):
         Initializes all attributes of the watcher instance.
 
         Args:
-            paths: Sequence of absolute paths to watch.
-            buffer: Thread-safe buffer to put Events into.
-            shutdown_event: Flag to stop the watcher gracefully if system asks for it.
+            paths_to_observe: Sequence of absolute paths to watch.
+            buffer:           Thread-safe buffer to put Events into.
+            shutdown_event:   Flag to stop the watcher gracefully if system asks for it.
         """
         ...
 
