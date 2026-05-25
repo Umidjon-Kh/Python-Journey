@@ -7,7 +7,7 @@ from os import replace
 from pathlib import Path
 from shutil import copy2, rmtree
 from time import monotonic
-from typing import Callable, Optional
+from typing import Optional
 
 from ...core import (
     BasePathLocker,
@@ -161,33 +161,32 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
             only necessary logs by filtering them using external management tools.
             For example you can filter by semantic name of the method prefix, adding
             it to the list of desired logs.
+        - SAJSnapshotsRegistryStore uses ignoring_paths injected by Bootstrap
+            to register all paths it touches during create() and restore()
+            operations, preventing the Dispatcher from processing self-generated
+            file system events.
     """
 
     _LOG_FILENAME = "saj_operations.log"
 
     def __init__(
-        self, backup_dir: str, registry_path: str, path_lock: BasePathLocker
+        self, backup_dir: str, registry_path: str, path_locker: BasePathLocker
     ) -> None:
         """
         Initializes the store, configures the operation journal, loads persisted
         snapshots metadata from disk if the registry file exists and its a JSON type
         file with valid format of data and recovers any incomplete operations leftovers
-        via the tumbler flag. Also initializes BasePathLock implementation methods, if
+        via the tumbler flag. Also initializes BasePathLock implementation , if
         implementation has acquire_shared() method uses it instead of simple acquire()
         to enable reading (without modifying) file system object while
-        SAJSnapshotsRegistryStore processes with it.
+        SAJSnapshotsRegistryStore creates a physical backup.
         """
         self._backup_dir: Path = Path(backup_dir + "/.vakt.backups")
         self._registry_path: Path = Path(registry_path)
         self._registry: dict[str, list[Snapshot]] = {}
         self._raw_registry: dict[str, dict] = {}
-        self._acquire: Callable[[str], str] = (
-            path_lock.acquire_shared  # type: ignore[assignment]
-            if hasattr(path_lock, "acquire_shared")
-            else path_lock.acquire
-        )
+        self._path_locker: BasePathLocker = path_locker
 
-        self._release: Callable[[str], None] = path_lock.release
         self._log: Logger = self._setup_logger()
 
         self._log.info(
@@ -202,18 +201,19 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
         self._log.info(
             "(__init__) done: loaded %d paths, lock=%s",
             len(self._registry),
-            type(path_lock).__name__,
+            type(path_locker).__name__,
         )
 
     def create(self, event: Event) -> Snapshot:
         """
         Creates a physical backup of the file system object described by the
         given event, registers the snapshot metadata and returns it.
-        Acquires a shared lock before copying to block writes during backup.
-        Verifies the backup integrity via checksum after copying. Registries
-        the snapshot only after successful verification.
-        Returns an empty Snapshot if copying or checksum verification fails,
-        allowing the caller to detect failure without exceptions.
+        Acquires a shared lock (if path_locker has acquire_shared method)
+        via path_locker to block writes and uses the returned locked path
+        to copying it during backup. Verifies the backup integrity via
+        checksum after copying. Registries the snapshot only after successful
+        verification. Returns an empty Snapshot if copying or checksum verification
+        fails, allowing the caller to detect failure without exceptions.
         """
         self._log.info("(create) start: path=%s", event.path)
 
@@ -230,7 +230,10 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
             event_type=event.event_type,
         )
 
-        locked_path = self._acquire(path)
+        if hasattr(self._path_locker, "acquire_shared"):
+            locked_path = self._path_locker.acquire_shared(path)  # type: ignore[not-explicit-attr]
+        else:
+            locked_path = self._path_locker.acquire(path)
         try:
             file_checksum = checksum(str(locked_path))
 
@@ -257,7 +260,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
             self._log.info("(create) done: path=%s backup=%s", path, backup_path)
 
         finally:
-            self._release(path)
+            self._path_locker.release(path)
 
         return snapshot
 
@@ -296,7 +299,8 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
         """
         Restores the file system object at the given path to the state
         captured in the snapshot at the given index.
-        Acquires a lock during restore to block writes while restoring.
+        Acquires an exclusive lock via path_locker to block read
+        and writes and uses the returned locked path to restore.
         Copies the backup to a temporary file first, verifies its checksum,
         then atomically replaces the target via os.replace().
         Logs a WARNING entry and returns if the path or index does not exist,
@@ -312,7 +316,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
             return
 
         tmp_path = Path(path + ".vakt.back")
-        locked_path = self._acquire(path)
+        locked_path = self._path_locker.acquire(path)
 
         try:
             self._raw_registry[path]["processing"] = True
@@ -334,7 +338,7 @@ class SAJSnapshotsRegistryStore(BaseSnapshotsRegistryStore):
             self._log.info("(restore) done: path=%s index=%d", path, index)
 
         finally:
-            self._release(path)
+            self._path_locker.release(path)
 
     def delete(self, path: str, index: int) -> None:
         """
