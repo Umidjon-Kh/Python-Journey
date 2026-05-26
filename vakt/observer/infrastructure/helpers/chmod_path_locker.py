@@ -1,26 +1,24 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from json import dump, load
-from os import chmod, environ, replace, stat
-from pathlib import Path
+from os import chmod, environ, makedirs, replace, stat
+from os.path import exists
 from stat import S_IMODE
-from sys import _getframe
-from typing import Union
+from typing import Any
 
-from ...core import BasePathLocker, ToolKit
+from ...core import BasePathLocker
 
 
 class ChmodPathLocker(BasePathLocker):
     """
     Implementation of BasePathLocker that supports multiple locking
     and provides exclusive and shared locking for file system objects by
-    renaming them to .vakt.lock suffixed path and restricting permissions
+    renaming them to .vak.lock suffixed path and restricting permissions
     via os.chmod().
 
     Why os.chmod() instead of fcntl.flock():
         fcntl.flock() provides advisory locking, it only blocks processes
-        that explicity check the lock. Common system tools like: cp, mv,
+        that explicitly check the lock. Common system tools like: cp, mv,
         vim, rsync, rename and most editors ignore it completely.
         To enforce real access restrictions against any external process
         (including uncooperative or suspicious ones), I use os.chmod()
@@ -32,24 +30,25 @@ class ChmodPathLocker(BasePathLocker):
         (suspect) processes while still allowing system-level recovery
         by root if it necessary.
 
-    How is robust protection and guaranteed restoration to
+    How is robust protection and guaranted restoration to
     original privileges ensured:
         The lock mechanism guarantees crash safety by writing original permission
         to persistent registry before modifying the filesystem object privileges.
         The registry acts as a transactional log: if the process dies before
         releasing the lock, the next startup reconciles the log against actual
         disk state and restores every stale object to its original name and
-        privileges. No external cleanup is required, the guarantee is built into the design.
-        Also that is the answer for why i renaming it with .vakt.lock suffix (to mark them).
+        privileges. No external cleanup is required, the guarantee is built into
+        the design. Also that is the answer for why i renaming it with
+        .vakt.lock suffix (to mark them as locked).
 
     Locking modes:
-        - acquire():        Exclusive lock that sets permission to 000.
+        - acquire():        Exclusive lock that sets permissions to 000.
                                 All processes are blocked from accessing the object
                                 except the superuser (root).
         - acquire_shared(): Shared lock that sets permission to 444.
                                 All processes can read but can't modify object.
-                                Intented for SnapshotsRegistryStore restore/create
-                                operations where reading must remain possible.
+                                Intended for SnapshotsRegistryStore create operation
+                                where reading must remain possible.
 
     Environment Variable (VAKT_SANCTUM):
         VAKT_SANCTUM - defines the root directory where the daemon stores
@@ -66,51 +65,32 @@ class ChmodPathLocker(BasePathLocker):
         This provides a single, predictable control point for operators and ensures
         that all sensitive data resides within a trusted directory hierarchy.
 
-    Specific Difference from other Implementations:
-        Unlike typical PathLocker implementations that only synchronize access,
-        ChmodPathLocker actively modifies file system permissions (chmod) and
-        renames objects. These modifications are observable as file system events.
-        Without mitigation, the Watcher would capture them and the Dispatcher
-        would process them as external changes - creating noise and potentially
-        incorrect state transitions.
-
-        To prevent this, ChmodPathLocker must inform the Dispatcher to temporarily
-        ignore the affected paths. However, due to architectural layering,
-        ChmodPathLocker has no direct access to the ignoring_paths dict: it is
-        instantiated as a helper component, not as a handler, and therefore does
-        not receive ToolKit directly.
-
-        As a pragmatic solution, ChmodPathLocker uses sys._getframe() to walk up
-        the call stack and locate the first ToolKit instance in the local variables
-        of any frame. This is typically the ToolKit owned by the handler that
-        invoked the lock. Once found, the suppress counter in ignoring_paths is
-        incremented for each affected path, ensuring the Dispatcher discards
-        self-generated events.
-
-        Design rationale: This approach avoids refactoring the core interface,
-        keeps the ignoring mechanism transparent, and localizes stack inspection
-        to where it is strictly necessary.
-
     Notes:
         - replace() is atomic at the kernel level. A directory of
             any size is replaced in O(1) without copying its contents.
-        - All methods that modifies or touchs a file system object automatically
-            informs Dispatcher about it using self._register_ignore() method.
+        - All methods that modifies or affect a file system object automatically
+            inform the Dispatcher about it by incrementing the path suppression by
+            one directly via self._ignoring_paths, provided from the configuration
+            dictionary on initialization.
     """
 
-    _DEFAULT_VAULT = "/var/lib/.vakt"
+    _DEFAULT_VAULT = "/var/lib/vakt/"
     _REGISTRY_FILENAME = "pathlock_registry.json"
 
-    def __init__(self) -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
         """
-        Initializes the instance. If the environment variable is not set,
-        falls back to the default vault path for loading and saving the
-        persistent registry. The registry is loaded only if the file exists
-        and contains a valid JSON array of locked path entries.
+        Initializes the instance. If environment variable is not set,
+        falls back to the default vault path for loading and saving
+        the persistent registry. The registry is loaded only if the file
+        exists and contains a valid JSON array of locked entries.Any errors raised
+        during file reading or parsing are intentionally not caught and
+        propagate to the caller - an invalid registry file at startup is
+        a configuration error that must be visible immediately.
         """
         vault = environ.get("VAKT_SANCTUM", self._DEFAULT_VAULT)
-        self._registry_path: Path = Path(vault) / self._REGISTRY_FILENAME
+        self._registry_path: str = vault + self._REGISTRY_FILENAME
         self._registry: dict[str, int] = {}
+        self._ignoring_paths: dict[str, int] = config["ignoring_paths"]
         self._load()
         self._recover_all()
 
@@ -148,13 +128,14 @@ class ChmodPathLocker(BasePathLocker):
         Releases the lock on the object at the given path.
 
         Recovers a concrete object recorded in the registry to the original state.
-        If path is not found in registry or original_path.vakt.lock object does not exists,
-        it means its already restored to original state.
-        After recovery the updated registry persists immediately.
-        Silently ignores if received path is not exist.
+        If path is not found in registry or original_path.vakt.lock object does
+        not exists, it means its already restored to original state. After recovery
+        the updated registry persists immediately. Silently ignores if received
+        path is not exist. Also informs the Dispatcher about affected paths
+        by incrementing paths supression counters by one.
         """
-        locked_path = Path(path + ".vakt.lock")
-        if not self._registry or not locked_path.exists():
+        locked_path = path + ".vakt.lock"
+        if not self._registry or not exists(locked_path):
             return
 
         original_privileges = self._registry.get(path, -1)
@@ -162,7 +143,10 @@ class ChmodPathLocker(BasePathLocker):
         if original_privileges != -1:
             chmod(locked_path, original_privileges)
             replace(locked_path, path)
-            self._register_ignore([locked_path, path])
+            self._ignoring_paths[locked_path] = (
+                self._ignoring_paths.get(locked_path, 0) + 1
+            )
+            self._ignoring_paths[path] = self._ignoring_paths.get(path, 0) + 1
 
         self._registry.pop(path, None)
         self._save()
@@ -177,27 +161,31 @@ class ChmodPathLocker(BasePathLocker):
         in registry. If received path is already exists in registry, it silently
         changes privileges of locked path to new privileges.
         After all this returns renamed locked path as a string.
+        Also informs the Dispatcher about affected paths by incrementing paths
+        supression counters by one.
         """
-        original_path = Path(path)
-        locked_path = original_path.with_suffix(".vakt.lock")
+        locked_path = path + ".vakt.lock"
         new_privileges = 0o444 if shared else 0o000
 
-        if not original_path.exists():
-            if locked_path.exists():
+        if not exists(path):
+            if exists(locked_path):
                 chmod(locked_path, new_privileges)
-                self._register_ignore([locked_path])
-            return str(locked_path)
+                self._ignoring_paths[locked_path] = (
+                    self._ignoring_paths.get(locked_path, 0) + 1
+                )
+            return locked_path
 
         original_privileges = S_IMODE(stat(path).st_mode)
         self._registry[path] = original_privileges
         self._save()
 
-        replace(original_path, locked_path)
+        replace(path, locked_path)
         chmod(locked_path, new_privileges)
 
-        self._register_ignore([locked_path, original_path])
+        self._ignoring_paths[locked_path] = self._ignoring_paths.get(locked_path, 0) + 1
+        self._ignoring_paths[path] = self._ignoring_paths.get(path, 0) + 1
 
-        return str(locked_path)
+        return locked_path
 
     def _recover_all(self) -> None:
         """
@@ -217,15 +205,34 @@ class ChmodPathLocker(BasePathLocker):
             return
 
         for original_path, original_privileges in self._registry.items():
-            locked_path = Path(original_path + ".vakt.lock")
+            locked_path = original_path + ".vakt.lock"
 
-            if locked_path.exists():
+            if exists(locked_path):
                 chmod(locked_path, original_privileges)
                 replace(locked_path, original_path)
-                self._register_ignore([locked_path, original_path])
+                self._ignoring_paths[locked_path] = (
+                    self._ignoring_paths.get(locked_path, 0) + 1
+                )
+                self._ignoring_paths[original_path] = (
+                    self._ignoring_paths.get(original_path, 0) + 1
+                )
 
         self._registry.clear()
         self._save()
+
+    def _load(self) -> None:
+        """
+        Loads locked path entries from the JSON registry file if it exists.
+        If the file is missing, loading is skipped silently. However, if the
+        file is present, it must be well-formed and not corrupted.
+        This is not advisory - it is a strict requirement for
+        critical data integrity.
+        """
+        if not exists(self._registry_path):
+            return
+
+        with open(self._registry_path, encoding="utf-8") as file:
+            self._registry = load(file)
 
     def _save(self) -> None:
         """
@@ -236,52 +243,18 @@ class ChmodPathLocker(BasePathLocker):
         atomic at the kernel level - if the process crashes during write
         the original registry file remains intact.
         """
-        self._registry_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = self._registry_path.with_suffix(".tmp")
+        makedirs(self._registry_path.rsplit("/", maxsplit=1)[0], exist_ok=True)
+        tmp_path = self._registry_path + ".tmp"
 
         with open(tmp_path, "w", encoding="utf-8") as file:
             dump(self._registry, file, indent=4)
 
         replace(tmp_path, self._registry_path)
 
-    def _load(self) -> None:
-        """
-        Loads locked path entries from the Json registry file if it exists.
-        If the file is missing, loading is skipped silently. However, if the
-        file is present, it must be well-formed and not corrupted.
-        This is not advisory - it is a strict requirement for
-        critical data integrity.
-        """
-        if not self._registry_path.exists():
-            return
-
-        with open(self._registry_path, encoding="utf-8") as file:
-            self._registry = load(file)
-
-    def _register_ignore(self, paths: Sequence[Union[str, Path]]) -> None:
-        """
-        Walks the call stack to locate the first ToolKit instance in local
-        variables of any frame (typically owned by the handler that invoked
-        the lock) and increments the suppress counter in ignoring_paths
-        for each affected path by one.
-
-        Each call accumulates independently: if the same path is registered
-        multiple times across separate operations, Dispatcher will suppress
-        exactly that many incoming events for it, preventing under-ignoring
-        when a single handler performs several modifications on the same object.
-
-        Silently does nothing if no object with ignoring_paths is found in
-        the call stack.
-        """
-        frame = _getframe(1)
-
-        while frame:
-            for obj in frame.f_locals.values():
-                if isinstance(obj, ToolKit):
-                    for path in paths:
-                        str_path = str(path)
-                        obj.ignoring_paths[str_path] = (
-                            obj.ignoring_paths.get(str_path, 0) + 1
-                        )
-                    return
-            frame = frame.f_back
+    def describe(self) -> dict[str, str]:
+        return {
+            "ignoring_paths": (
+                "dict[str, int] - required. Injected automatically by Bootstrap. "
+                "No additional configuration is required for this implementation."
+            ),
+        }
