@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from typing import Optional
+from typing import Any, Optional
 
 from ..domain import Event
 from .snapshot import Snapshot
@@ -35,6 +35,9 @@ class BaseSnapshotsRegistryStore(ABC):
     Snapshots are accessed by index (snapshot_N) where N is the position
     in the history sequence. The latest snapshot is always at index -1.
 
+    Why __init__ accepts config dict and why describe method:
+        See BaseInstructionsRegistry documentation.
+
     Why ignoring_paths is a required attribute:
         Every SnapshotsRegistryStore implementation interacts with the file
         system directly during create() and restore() operations. These
@@ -44,9 +47,7 @@ class BaseSnapshotsRegistryStore(ABC):
 
         To prevent this, every implementation must register affected paths
         into ignoring_paths so the Dispatcher suppresses those self-generated
-        events. ignoring_paths is injected by Bootstrap after assembly and
-        is a non-optional dependency - every implementation is expected to
-        use it whenever it touches the file system.
+        events.
 
     Persistence Requirements:
         All implementations MUST persist the registry after every modification
@@ -74,15 +75,20 @@ class BaseSnapshotsRegistryStore(ABC):
             management utilities and are not used by the daemon itself.
         - By default does not require thread-safety as it is only used by handlers
             that operate in the Dispatcher layer.
-        - The BaseSnapshotsRegistryStore does not have an __init__ method
-            because some inheritors may require explicitly passing the path to
-            the backup and registry, while others rely on values set within a
-            specific implementation.
-        - ignoring_paths is injected by Bootstrap after assembly via:
-            snapshots_registry.ignoring_paths = toolkit.ignoring_paths
     """
 
-    ignoring_paths: dict[str, int]
+    @abstractmethod
+    def __init__(self, config: dict[str, Any]) -> None:
+        """
+        Initializes the registry store instance from the provided config dict.
+        ignoring_paths is a required key injected automatically by Bootstrap.
+        See BaseInstructionsRegistry.__init__() for full contract details.
+
+        Arg:
+           config: A dictionary of string keys and dependency resources
+                    required for concrete implementation.
+        """
+        ...
 
     @abstractmethod
     def create(self, event: Event) -> Snapshot:
@@ -162,5 +168,15 @@ class BaseSnapshotsRegistryStore(ABC):
         Intended only for external management utilities.
         Silently ignores if registry is already empty.
         Implementations must persist the registry immediately after clearing.
+        """
+        ...
+
+    @abstractmethod
+    def describe(self) -> dict[str, str]:
+        """
+        Returns a dict where each key is the name of a config parameter
+        this implementation expects and each value is a human-readable
+        description including its type and whether it is required or optional.
+        See BaseInstructionsRegistry.describe() for full contract details.
         """
         ...
