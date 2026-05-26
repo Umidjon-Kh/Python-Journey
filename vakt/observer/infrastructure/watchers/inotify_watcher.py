@@ -257,6 +257,8 @@ class InotifyWatcher(BaseWatcher):
                     )
                 )
 
+            self._flush_expired_pending()
+
     def _scan(self) -> None:
         """
         Subscribe to all paths and normalizes them in place.
