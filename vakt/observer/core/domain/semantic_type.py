@@ -22,15 +22,21 @@ class SemanticTypesMeta(type):
         - Only uppercase attributes are wrapped (key.isupper()) to avoid
             wrapping methods or other non-constant string attributes.
         - Attributes starting with underscore are always skipped.
+        - Direct subclasses of SemanticType (e.g. EventType, InstructionType, LevelType)
+            automatically receive their own isolated _cache dict at class creation time.
+            Their subclasses (e.g. InotifyEventType, CrossPlatformEventType) inherit
+            and write into their parent's cache via normal MRO attribute lookup.
     """
 
     def __new__(
         mcs,
         name: str,
-        bases: tuple,
+        bases: tuple[type],
         namespace: dict[str, Any],
     ) -> SemanticTypesMeta:
         cls = super().__new__(mcs, name, bases, namespace)
+        if bases and bases[0].__name__ == "SemanticType":
+            setattr(cls, "_cache", {})
         for key, value in namespace.items():
             if not key.startswith("_") and isinstance(value, str) and key.isupper():
                 setattr(cls, key, cls(value))
@@ -61,6 +67,16 @@ class SemanticType(str, metaclass=SemanticTypesMeta):
             - All subclass constants are instances of their own subclass.
             - All values are fully compatible with plain string comparisons.
 
+    Why caching:
+        SemanticType.__new__ caches every created instance in the _cache of its
+        direct SemanticType subclass. This guarantees that identical string values
+        always return the exact same object, enabling identity checks (is, in)
+        to work correctly even after deserialization. Without caching, wrapping
+        the same string value twice would produce two different objects and
+        identity checks would always return False.
+        As a side effect, caching also reduces memory usage - no matter how many
+        times the same value is requested, only one instance exists in memory.
+
     Notes:
         - SemanticType is a str subclass so it is fully compatible with
             plain string comparisons and operations.
@@ -68,7 +84,17 @@ class SemanticType(str, metaclass=SemanticTypesMeta):
             SemanticTypesMeta without any additional configurations.
         - Do not add members to SemanticType directly - create
             domain-specific subclass for each semantic category.
+        - Each direct subclass of SemanticType has its own isolated cache.
+            Subclasses of those share their parent's cache via MRO lookup.
     """
+
+    def __new__(cls, value: str):
+        cache = getattr(cls, "_cache", {})
+        if value not in cache:
+            instance = super().__new__(cls, value)
+            cache[value] = instance
+
+        return cache[value]
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}={str(self)!r}"
