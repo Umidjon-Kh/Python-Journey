@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class BasePathLocker(ABC):
@@ -33,13 +34,31 @@ class BasePathLocker(ABC):
         implementation details. Implementations that do not move the object
         simply return the original path unchanged.
 
+    Why ignoring_paths is required in config:
+        Not all implementations can operate with full OS-level blocking.
+        Implementations running without root privileges may only be able
+        to restrict permissions or just rename object rather then fully block
+        access. This, in turn, creates a risk of the daemon may process changes
+        that it generated it self (e.g., permissions changes or renames), leading
+        either to incorrect event handling or corruption of the physical object.
+
+        To avoid this, an ignore_paths dictionary is used. It tells the dispatcher
+        how many times to suppress events for a given object. This dictionary is
+        automatically injected by Bootstrap component into the config argment
+        (a configuration dictionary) of the implementation, from which an instance
+        is then created.
+
+        One example is the base implementation ChmodPathLocker. Each time acquire()
+        is called, it changes the object's permissions and renames it, marking it as
+        locked. To prevent the daemon from processing these two events (permission change and
+        rename), the reference counter for those objects is incremented - once for each
+        event separately.
+
     Notes:
         - PathLocker operates at the OS level, not the thread level.
             It blocks access from external processes, not just threads
             within the same process.
         - Not all implementations can operate with full OS-level blocking.
-            Implementations running without root privileges may only be
-            able to restrict permissions rather than fully block access.
             Callers must not assume that acquire() provides a hard kernel lock.
         - Implementations must ensure that release() is always called
             after acquire(), even if an error occurs. Use try/finally
@@ -61,6 +80,19 @@ class BasePathLocker(ABC):
     """
 
     @abstractmethod
+    def __init__(self, config: dict[str, Any]) -> None:
+        """
+        Initializes the path locker instance from the provided config dict.
+        ignoring_paths is a required key injected automatically by Bootstrap.
+        See BaseInstructionsRegistry.__init__() for full contract details.
+
+        Arg:
+           config: A dictionary of string keys and dependency resources
+                    required for concrete implementation.
+        """
+        ...
+
+    @abstractmethod
     def acquire(self, path: str) -> str:
         """
         Acquires an exclusive lock on the object at the given path.
@@ -78,5 +110,15 @@ class BasePathLocker(ABC):
         Releases the lock on the object at the given path.
         Must always be called after acquire() to release object and
         give access to other processes.
+        """
+        ...
+
+    @abstractmethod
+    def describe(self) -> dict[str, str]:
+        """
+        Returns a dict where each key is the name of a config parameter
+        this implementation expects and each value is a human-readable
+        description including its type and whether it is required or optional.
+        See BaseInstructionsRegistry.describe() for full contract details.
         """
         ...
