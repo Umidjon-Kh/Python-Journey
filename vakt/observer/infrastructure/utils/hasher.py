@@ -1,4 +1,6 @@
 from hashlib import sha256
+from os import walk
+from os.path import isfile, join
 
 
 def hash_path(path: str) -> str:
@@ -23,31 +25,41 @@ def hash_path(path: str) -> str:
 
 def checksum(path: str) -> str:
     """
-    Computes a SHA-256 checksum for the file content at the given path
-    and returns it as a hexadecimal digest string.
+    Computes a SHA-256 checksum for the contents of a file system object
+    at the specified path and returns a string with a hexadecimal
+    representation (hex digest). Supports both files and directories,
+    using a Merkle tree-based approach. This guarantees an identical,
+    unchanging checksum for the same object state, regardless of the order
+    in which the data is retrieved, which may vary across file systems.
 
-    Intended for integrity verification and content comparison tasks,
-    for example:
-        - detecting file modifications
-        - validating stored files
-        - comparing files by content
-        - identifying data corruption
-
-    The file is read incrementally in chunks to avoid loading the
-    entire file into memory, which keeps memory usage stable even
-    for large files.
+    Designed for integrity checking and comparison of file system object
+    contents, such as:
+        - detecting implicit changes to object contents
+        - verifying the integrity of backup data before use
+        - comparing objects by content
+        - detecting data corruption
 
     SHA-256 from the hashlib module is used because it provides a deterministic
     cryptographic digest with a very low probability of collisions.
 
     Notes:
         - The function assumes that the provided path exists and points
-            to a readable file. So ensure that!
+            to a readable file. So ensure that.!
+        - If received object path is does not exist, the operation of this
+            utility may break or return an incorrect result.
     """
     content_hash = sha256()
 
-    with open(path, "rb") as file:
-        for chunk in iter(lambda: file.read(65536), b""):
-            content_hash.update(chunk)
+    if isfile(path):
+        with open(path, "rb") as file:
+            for chunk in iter(lambda: file.read(65536), b""):
+                content_hash.update(chunk)
+
+    else:
+        for root, dirs, files in walk(path):
+            dirs.sort()
+            for file in sorted(files):
+                file_path = join(root, file)
+                content_hash.update(checksum(file_path).encode())
 
     return content_hash.hexdigest()
