@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ...core import (
-    BaseInstructionRegistry,
+    BaseInstructionsRegistry,
     Event,
     EventType,
     Instruction,
@@ -17,9 +17,9 @@ from ...core import (
 from ..utils import match_path
 
 
-class GlobInstructionRegistry(BaseInstructionRegistry):
+class GlobInstructionsRegistry(BaseInstructionsRegistry):
     """
-    Implementation of BaseInstructionRegistry that persists the registry
+    Implementation of BaseInstructionsRegistry that persists the registry
     to disk as a JSON file and matches Instructions using custom glob-style
     paths patterns.
 
@@ -77,21 +77,38 @@ class GlobInstructionRegistry(BaseInstructionRegistry):
         - A default instruction is provided via __init__:
             A reason that allows top-level objects to set a default
             Instruction types for non-matching events.
-        - Registry not checks to None in fields of Instruction, it checks
-            for boolean bool(field of instruction) to emit properly empty sequences.
+        - Registry does not check for None in Instruction fields directly.
+          It uses bool(field) to handle empty sequences correctly.
     """
 
-    def __init__(self, registry_path: str, default: Instruction) -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
         """
-        Initializes the registry and loads persisted Instructions from
-        disk only if the registry file exists at provided registry_path,
-        So ensure that the paths exists and its a JSON type of file
-        with valid format only if you want to load persisted Instructions.
+        Initializes the registry, loads persisted Instructions from disk
+        if the registry file exists at the provided path. Any errors raised
+        during file reading or parsing are intentionally not caught and
+        propagate to the caller - an invalid registry file at startup is
+        a configuration error that must be visible immediately.
+        See BaseInstructionsRegistry.__init__() for full config contract details.
         """
-        self._registry_path: Path = Path(registry_path)
-        self._default: Instruction = default
+
+        self._registry_path: Path = Path(config["registry_path"])
+
+        raw_instruction = config.get("default", None)
+
+        self._default: Instruction = (
+            Instruction(
+                event_types=raw_instruction.get("event_types"),
+                paths=raw_instruction.get("paths"),
+                level=raw_instruction.get("level"),
+                types=raw_instruction.get("types", [InstructionType.LOG]),  # type: ignore[assignment]
+            )
+            if raw_instruction
+            else Instruction(types=[InstructionType.LOG])  # type: ignore[assignment]
+        )
+
         self._registry: list[Instruction] = []
         self._raw_registry: list[dict] = []
+
         self._load()
 
     def add(self, instruction: Instruction) -> None:
@@ -178,6 +195,20 @@ class GlobInstructionRegistry(BaseInstructionRegistry):
         self._registry.clear()
         self._raw_registry.clear()
         self._save()
+
+    def describe(self) -> dict[str, str]:
+        return {
+            "registry_path": (
+                "str - required. Absolute path to the JSON registry file. "
+                "Created automatically if it does not exist. "
+                "Errors during reading or parsing propagate to the caller."
+            ),
+            "default": (
+                "dict - optional. Default Instruction returned by get() when no "
+                "matching Instruction is found. Accepted keys: event_types, paths, "
+                "level, types. If not provided defaults to Instruction(types=[InstructionType.LOG])."
+            ),
+        }
 
     def _save(self) -> None:
         """

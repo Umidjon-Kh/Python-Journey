@@ -1,5 +1,5 @@
-from .glob_instruction_registry import GlobInstructionRegistry
+from .glob_instructions_registry import GlobInstructionsRegistry
 
 __all__ = [
-    "GlobInstructionRegistry",
+    "GlobInstructionsRegistry",
 ]
