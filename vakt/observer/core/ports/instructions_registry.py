@@ -7,23 +7,40 @@ from typing import Any
 from ..domain import Event, Instruction
 
 
-class BaseInstructionRegistry(ABC):
+class BaseInstructionsRegistry(ABC):
     """
     Abstract base class for instruction registry.
 
-    InstructionRegistry is responsible for two things at once:
+    InstructionsRegistry is responsible for two things at once:
         1. Registry - stores and manages Instruction objects.
         2. Matcher - selects the most appropriate Instruction
             for an incoming Event based on its own matching strategy.
 
     This design enables developers to provide their own matching logic:
-        - GlobInstructionRegistry:     matches by glob patterns in Instruction.paths.
-        - RegexInstructionRegistry:    matches by regex patterns.
-        - PriorityInstructionRegistry: matches by priority rules.
+        - GlobInstructionsRegistry:     matches by glob patterns in Instruction.paths.
+        - RegexInstructionsRegistry:    matches by regex patterns.
+        - PriorityInstructionsRegistry: matches by priority rules.
 
     get() always returns an Instruction - if no matching Instruction is found,
     it returns a default Instruction provided via __init__ of the implementation.
     This guarantees that the Dispatcher always receives a valid Instruction.
+
+    Why __init__ accepts config dictionary:
+        Bootstrap is responsible for instantiating all implementations but operates only
+        on abstractions without knowing the specific parameters each implementation
+        requires. A config dictionary provides a uniform contract that all implementations
+        validate whatever keys it needs. This keeps Bootstrap closed to modification
+        when new implementations are added and avoids exposing implementation-specific
+        parameters to upper layer objects.
+
+    Why describe method:
+        Since __init__ accepts an untyped config dict, there is no static way
+        for upper layer objects or external tools to know which keys a specific
+        implementation expects. describe() fills this gap by returning a human-readable
+        explanation of all expected config keys, their types and whether they are required
+        or optional. This turns the otherwise opaque config dictionary into a
+        self-documenting contract that any developer or management tool can query at
+        runtime withuot reading the source code.
 
     Persistence Advisory:
         All implementations recommend persisting registry after each modification
@@ -46,10 +63,21 @@ class BaseInstructionRegistry(ABC):
             by Dispatcher which operates in a single thread and does not modify registry.
         - All implementations not requires to respect graceful shutdown as it is
             responsibility of upper layer objects (Threads).
-        - BaseInstructionRegistry does not have an __init__ method
-            because some inheritors  may require explicitly passing the path to
-            registry, while others rely on values set within a specific implementation.
+        - If the implementation does not use a configuration dictionary, it is
+            recommended to simply ignore it, leaving it as an initialization
+            argument to the linter stub.
     """
+
+    @abstractmethod
+    def __init__(self, config: dict[str, Any]) -> None:
+        """
+        Initializes all attributes of registry instance.
+
+        Arg:
+           config: A dictionary of string keys and dependency resources
+                    required for concrete implementation.
+        """
+        ...
 
     @abstractmethod
     def add(self, instruction: Instruction) -> None:
@@ -97,5 +125,20 @@ class BaseInstructionRegistry(ABC):
         Intended only for external management utilities.
         Must silently ignore if the registry if already empty and
         also recommends to persists the registry after clearing.
+        """
+        ...
+
+    @abstractmethod
+    def describe(self) -> dict[str, str]:
+        """
+        Returns a dict where each key is the name of a config parameter
+        this implementation expects, and each value is a human-readable
+        description of that parameter including its type and whether
+        it is required or optional.
+
+        Intended for upper layer objects, Bootstrap and external management
+        tools that need to know what to place in the config dict before
+        instantiating this implementation. Allows runtime introspection
+        without reading source code.
         """
         ...

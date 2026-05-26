@@ -16,7 +16,7 @@ from .helpers import (
 from .ports import (
     BaseHandler,
     BaseHeartBeater,
-    BaseInstructionRegistry,
+    BaseInstructionsRegistry,
     BaseWatcher,
 )
 from .services import Dispatcher
@@ -31,7 +31,7 @@ __all__ = [
     "LevelType",
     "BaseHandler",
     "BaseHeartBeater",
-    "BaseInstructionRegistry",
+    "BaseInstructionsRegistry",
     "BaseWatcher",
     "ToolKit",
     "Snapshot",

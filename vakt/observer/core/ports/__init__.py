@@ -1,11 +1,11 @@
 from .handler import BaseHandler
 from .heart_beater import BaseHeartBeater
-from .instruction_registry import BaseInstructionRegistry
+from .instructions_registry import BaseInstructionsRegistry
 from .watcher import BaseWatcher
 
 __all__ = [
     "BaseHandler",
     "BaseHeartBeater",
-    "BaseInstructionRegistry",
+    "BaseInstructionsRegistry",
     "BaseWatcher",
 ]

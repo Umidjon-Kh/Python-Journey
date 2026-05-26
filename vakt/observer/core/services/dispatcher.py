@@ -6,7 +6,7 @@ from threading import Event as ShutdownEvent
 from threading import Thread
 
 from ..domain import Event, EventContext
-from ..ports import BaseHandler, BaseInstructionRegistry
+from ..ports import BaseHandler, BaseInstructionsRegistry
 
 
 class Dispatcher:
@@ -78,7 +78,7 @@ class Dispatcher:
     def __init__(
         self,
         buffer: Queue[Event],
-        instruction_registry: BaseInstructionRegistry,
+        instruction_registry: BaseInstructionsRegistry,
         handlers: Sequence[BaseHandler],
         ignoring_paths: dict[str, int],
         shutdown_event: ShutdownEvent,
@@ -94,7 +94,7 @@ class Dispatcher:
             shutdown_event: Tumbler that needs to shutdown gracefully.
         """
         self._buffer: Queue[Event] = buffer
-        self._instruction_registry: BaseInstructionRegistry = instruction_registry
+        self._instruction_registry: BaseInstructionsRegistry = instruction_registry
         self._handlers: Sequence[BaseHandler] = handlers
         self._ignoring_paths: dict[str, int] = ignoring_paths
         self._shutdown_event: ShutdownEvent = shutdown_event

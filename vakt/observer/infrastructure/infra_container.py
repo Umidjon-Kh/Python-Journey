@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from ..core import (
     BaseHandler,
     BaseHeartBeater,
-    BaseInstructionRegistry,
+    BaseInstructionsRegistry,
     BasePathLocker,
     BaseSnapshotsRegistryStore,
     BaseWatcher,
@@ -59,6 +59,6 @@ class InfraContainer:
     watchers: Sequence[type[BaseWatcher]] = []
     handlers: Sequence[type[BaseHandler]] = []
     heartbeaters: Sequence[type[BaseHeartBeater]] = []
-    instruction_registries: Sequence[type[BaseInstructionRegistry]] = []
+    instruction_registries: Sequence[type[BaseInstructionsRegistry]] = []
     snapshots_registry_stores: Sequence[type[BaseSnapshotsRegistryStore]] = []
     path_lockers: Sequence[type[BasePathLocker]] = []
