@@ -44,10 +44,10 @@ class ToolKit:
                                    Value of -1 means suppress indefinitely.
         - path_locker:         Helper for locking file system paths to prevent
                                    external modification during handler operations.
-        - snapshots_registry:  Helper for creating, retrieving and managing
+        - snapshots_registry_store:  Helper for creating, retrieving and managing
                                    file snapshots used by backup and restore handlers.
     """
 
     ignoring_paths: dict[str, int]
     path_locker: BasePathLocker
-    snapshots_registry: BaseSnapshotsRegistryStore
+    snapshots_registry_store: BaseSnapshotsRegistryStore
