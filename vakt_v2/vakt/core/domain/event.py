@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from .semantic_types import SemanticType
+from .semantic_type import SemanticType
 
 
 class EventType(SemanticType):
