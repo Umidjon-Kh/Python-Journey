@@ -63,6 +63,9 @@ def _match_glob(pattern: str, path: str) -> bool:
         /etc/**/passwd          matches /etc/passwd, /etc/ssl/passwd
         /etc/ssl/**/cert.pem    matches /etc/ssl/cert.pem, /etc/ssl/src/core/cert.pem
         /etc/**/*.log           matches /etc/app.log, /etc/logs/app.log
+
+    /etc/**/ceml/hello.txt - 5
+    /etc/wow/uwu/ceml/hello.txt - 6
     """
     pattern_segs = pattern.split("/")
     path_segs = path.split("/")
@@ -118,10 +121,10 @@ def match_path(
     if not patterns:
         return (1, 0)
 
-    best: Optional[tuple[int, int]] = None
+    best: Optional[tuple[float, int]] = None
     parent, file_name = path.rsplit("/", maxsplit=1)
 
-    def update(score: tuple[int, int]) -> None:
+    def update(score: tuple[float, int]) -> None:
         nonlocal best
         if best is None or score > best:
             best = score
@@ -148,9 +151,16 @@ def match_path(
                 update((5, tiebreaker))
 
         # 3.Scenario: Deep glob with anchors
-        elif "**" in pattern and pattern not in (base + "/**", "/**"):
-            if _match_glob(pattern, path):
-                update((4, tiebreaker))
+        elif "**" in pattern and pattern not in ("/**", "/**/**", "**/**", "/**/*"):
+            if pattern.endswith("/*"):
+                if _match_glob(pattern, path):
+                    update((4.1, tiebreaker))
+            elif pattern.endswith("/**"):
+                if _match_glob(pattern, path):
+                    update((4.2, tiebreaker))
+            else:
+                if _match_glob(pattern, path):
+                    update((4.3, tiebreaker))
 
         # 4.Scenario: Non-recursive
         elif pattern.endswith(("/*", "/")):
