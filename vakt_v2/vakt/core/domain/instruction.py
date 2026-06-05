@@ -139,18 +139,31 @@ class Instruction:
             supported and matched sequentially.
 
         Priority 4 — Deep glob with anchors:
-            /etc/**/passwd          matches /etc/passwd, /etc/ssl/passwd
-            /etc/**/*.conf          matches /etc/app.conf, /etc/ssl/nginx.conf
-            /var/**/app_*.log       matches any depth, with wildcard on filename
-            ** absorbs zero or more path segments at any depth. Must have at least
-            one concrete anchor before or after ** (not a bare /base/** pattern —
-            that belongs to Priority 2).
+            Patterns containing ** with at least one concrete anchor segment
+            before or after it. Split into three sub-levels by suffix type:
 
-        Priority 3 — Non-recursive:
-            /etc/*
-            /var/log/
-            Matches only the direct children of the base path. Does not descend
-            into subdirectories. Trailing "/" is treated identically to "/*".
+            Priority 4.3 — Concrete anchor (highest among deep globs):
+                /etc/**/passwd          matches /etc/passwd, /etc/ssl/passwd
+                /etc/**/*.conf          matches /etc/app.conf, /etc/ssl/nginx.conf
+                /var/**/app_*.log       matches any path with that filename at any depth
+                ** absorbs zero or more segments; suffix is a concrete name or
+                segment wildcard — not /* or /**.
+
+            Priority 4.2 — Deep glob + recursive suffix:
+                /etc/**/folder/**       matches anything inside folder/ at any depth
+                                        under /etc/
+                /var/**/logs/**         matches any descendant of any logs/ under /var/
+
+            Priority 4.1 — Deep glob + non-recursive suffix:
+                /etc/**/folder/*        matches only direct children of folder/
+                                        wherever folder/ appears under /etc/
+                /var/**/logs/*          matches only direct children of any logs/ under /var/
+
+                Priority 3 — Non-recursive:
+                    /etc/*
+                    /var/log/
+                    Matches only the direct children of the base path. Does not descend
+                    into subdirectories. Trailing "/" is treated identically to "/*".
 
         Priority 2 — Recursive:
             /etc/**
@@ -167,6 +180,12 @@ class Instruction:
             No "/" in the pattern — matched against the filename component only,
             regardless of the directory. Lowest priority, always loses to any
             rooted pattern when both match.
+
+        Invalid patterns (not supported, produce no match):
+            /**          - bare global recursive, no base path
+            /**/**       - chained globals
+            **/**        - unrooted double glob
+            /**/*        - bare global non-recursive
 
         Tiebreaker (equal priority):
             Among patterns at the same priority level, the one with more concrete
