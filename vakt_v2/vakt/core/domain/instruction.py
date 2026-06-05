@@ -108,12 +108,72 @@ class Instruction:
                         An incoming event matches if its type is in the collection.
                         If None, instruction applies to all event types.
         - paths:       Glob patterns of file system paths the instruction applies to.
-                        If None, instruction applies to all paths.
+                        If None, instruction applies to all paths unconditionally.
+                        Patterns follow the Path Syntax Protocol described below.
+                        When multiple patterns match a single path, the highest-priority
+                        pattern wins. On equal priority, the pattern with more concrete
+                        characters (fewer wildcards) wins.
         - level:       Semantic classification of the event.
                         Used by handlers to decide how to present or react to the event.
         - types:       Collection of InstructionType values that define what actions
                         should be performed when a matching event occurs.
                         If None, no actions are performed.
+
+    Path Syntax Protocol:
+        Patterns are matched against the full absolute path of an incoming event.
+        Six pattern types are recognized, ordered from highest to lowest priority:
+
+        Priority 6 — Exact match:
+            /etc/passwd
+            /var/log/syslog
+            Matches only the exact absolute path. Highest priority — always
+            preferred over any wildcard pattern when both match.
+
+        Priority 5 — Segment wildcard:
+            /etc/settings*          matches /etc/settings.conf, /etc/settings_backup
+            /etc/*.conf             matches /etc/app.conf, /etc/nginx.conf
+            /var/log/app_*_v2.log   pieces within the segment must appear in order
+            A wildcard (*) within a path segment. Must contain a "/" (rooted) and
+            must not end with "/*" (that is the non-recursive pattern). ** is not
+            allowed in this category. Multiple wildcards within one segment are
+            supported and matched sequentially.
+
+        Priority 4 — Deep glob with anchors:
+            /etc/**/passwd          matches /etc/passwd, /etc/ssl/passwd
+            /etc/**/*.conf          matches /etc/app.conf, /etc/ssl/nginx.conf
+            /var/**/app_*.log       matches any depth, with wildcard on filename
+            ** absorbs zero or more path segments at any depth. Must have at least
+            one concrete anchor before or after ** (not a bare /base/** pattern —
+            that belongs to Priority 2).
+
+        Priority 3 — Non-recursive:
+            /etc/*
+            /var/log/
+            Matches only the direct children of the base path. Does not descend
+            into subdirectories. Trailing "/" is treated identically to "/*".
+
+        Priority 2 — Recursive:
+            /etc/**
+            /var/log/**
+            Matches any descendant at any depth under the base path.
+            /etc/passwd, /etc/ssl/cert.pem, /etc/ssl/certs/ca-bundle.pem all match
+            /etc/**. Lower priority than all anchored patterns, so /etc/**/passwd
+            (Priority 4) always beats /etc/** (Priority 2) for /etc/ssl/passwd.
+
+        Priority 1 — Global name / wildcard (lowest):
+            passwd                  matches any path whose filename is "passwd"
+            *.conf                  matches any path whose filename ends with .conf
+            app_*                   matches any path whose filename starts with app_
+            No "/" in the pattern — matched against the filename component only,
+            regardless of the directory. Lowest priority, always loses to any
+            rooted pattern when both match.
+
+        Tiebreaker (equal priority):
+            Among patterns at the same priority level, the one with more concrete
+            characters wins (len(pattern) after removing all "*" characters).
+            /etc/ssl/** beats /etc/** for /etc/ssl/cert.pem (longer concrete base).
+            /etc/settings.conf beats /etc/*.conf if both somehow reach the same
+            priority (longer concrete part wins).
 
     Notes:
         - Instruction is frozen because behavioral contracts must not change at runtime.
@@ -125,13 +185,10 @@ class Instruction:
             add handlers that support those custom event types.
         - If you use a Custom InstructionType you need to provide it inherited from
             InstructionType and add handlers that support those custom instruction types.
-        - In path glob patterns field if you want to apply instruction to all
-            objects in a directory use "/*" at the end of the directory name.
-            If you want to apply instruction to all objects recursively use "/**".
 
     Example:
         event_types: Sequence[CrossPlatformEventType.FILE_MODIFIED]
-        paths:       Sequence["/etc/passwd", "/usr/local/*"]
+        paths:       Sequence["/etc/passwd", "/etc/ssl/**", "/var/log/*.log"]
         level:       LevelType.SUSPICIOUS
         types:       Sequence[InstructionType.LOG, InstructionType.BACKUP]
     """
