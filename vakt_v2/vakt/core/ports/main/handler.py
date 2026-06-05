@@ -58,8 +58,8 @@ class BaseHandler(PortProtocol):
             Note: certain Invokers may depend on other handlers — for example
             ResponseCollector or handlers that can inject new InstructionType
             values into Instruction.types at runtime (such as Alerter, which
-            notifies the user via a desktop notification and asks what action to
-            take). Invokers that care about such dynamic instruction injection
+            notifies the user via a desktop notification and asks what actions
+            to take). Invokers that care about such dynamic instruction injection
             must check for those additions themselves via can_handle().
             Examples: BackupInvoker and RestoreInvoker that calls create()/restore()
                       on SnapshotsRegistryStore implementation or,
@@ -70,7 +70,10 @@ class BaseHandler(PortProtocol):
             another handler. Uses ctx.performed to check whether the required
             action has already been completed before returning True from
             can_handle(). Waits silently across loop iterations until the
-            dependency signal appears in ctx.performed.
+            dependency signal appears in ctx.performed. Also like Invokers
+            this classification of handler may depend on other handlers that
+            can inject new InstructionType values into Instruction.types. This can
+            trigger further handlers, including the ones this handler itself depends on.
             Examples: SnapshotsRotator (triggers only after InstructionType.BACKUP
                       appears in ctx.performed, meaning a snapshot was created).
 
