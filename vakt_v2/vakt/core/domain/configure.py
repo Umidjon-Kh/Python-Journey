@@ -98,7 +98,7 @@ class Configure:
         return self._internal_reqs
 
     def client_reqs(self) -> dict[str, str]:
-        return {p: v for p, (v, _) in self._client_reqs}
+        return {p: v for p, (v, _) in self._client_reqs.items()}
 
     def check_out(self) -> None:
         """

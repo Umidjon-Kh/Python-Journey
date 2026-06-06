@@ -159,11 +159,11 @@ class Instruction:
                                         wherever folder/ appears under /etc/
                 /var/**/logs/*          matches only direct children of any logs/ under /var/
 
-                Priority 3 — Non-recursive:
-                    /etc/*
-                    /var/log/
-                    Matches only the direct children of the base path. Does not descend
-                    into subdirectories. Trailing "/" is treated identically to "/*".
+        Priority 3 — Non-recursive:
+            /etc/*
+            /var/log/
+            Matches only the direct children of the base path. Does not descend
+            into subdirectories. Trailing "/" is treated identically to "/*".
 
         Priority 2 — Recursive:
             /etc/**
