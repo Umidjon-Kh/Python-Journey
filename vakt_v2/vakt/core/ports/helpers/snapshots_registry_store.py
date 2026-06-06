@@ -114,6 +114,9 @@ class BaseSnapshotsRegistryStore(PortProtocol):
             or missing. That serves as an expression of snapshot creation is failed.
         - Must never propagate exceptions to the caller. All errors must be caught
             and handled internally.
+        - Implementations that require exclusive access to a file system object
+            during backup creation or restoration should declare BasePathLocker
+            in their Configure internal_reqs.
     """
 
     @abstractmethod
