@@ -87,6 +87,11 @@ class BasePathLocker(PortProtocol):
             require a persistent store for crash recovery — simpler than a full
             registry, but subject to the same crash guarantee.
 
+    Example implementations:
+        - FcntlPathLocker: Linux/macOS, uses fcntl.flock().
+        - WindowsPathLocker: Windows, uses msvcrt.locking().
+        - ChmodPathLocker: Linux, uses chmod to restrict permissions.
+
     Notes:
         - PathLocker operates at the OS level, not the thread level. It blocks
             access from external processes, not just threads within the same process.
