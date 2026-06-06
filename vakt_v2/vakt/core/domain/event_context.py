@@ -44,10 +44,11 @@ class EventContext:
             SnapshotsRotator can check whether a backup was actually created before acting.
         - metadata: an open key-value buffer for inter-handler communication.
             Handlers may read and write arbitrary data keyed by any hashable value.
-            This is the primary channel for passing rish results between handlers.
-            For example, BackupInvoker stores the created Snapshot object in metadata
-            so that other handlers can acces it without coupling to a specific field
-            EventContext.
+            This is the primary channel for passing rich results between handlers.
+            For example, Antimutator stores the acquired lock under its own key so
+            that an EndRunner handler can later either prompt the user to decide
+            whether to release the locked object or automatically release it after
+            a set period.
 
     Why performed uses InstructionType and not str:
         Using InstructionType provides type safety, IDE autocompletion and
@@ -63,10 +64,10 @@ class EventContext:
         two fundamentally different questions with different consumers.
 
     Why metadata instead of dedicated fields for handler results:
-        Dedicated fields like snapshot: Snapshot would couple EventContext
-        to specific handler implementations and force every inter-handler
-        result into the typed domain model. metadata is an untyped open
-        playground that allows any handler to store and retrieve rich
+        Dedicated fields for every possible inter-handler result would couple
+        EventContext to specific handler implementations and force every
+        intermediate result into the typed domain model. metadata is an untyped
+        open playground that allows any handler to store and retrieve rich
         structured data without modifying core domain objects. Handlers
         are responsible for defining their own key conventions to avoid
         accidental collisions with other handlers.

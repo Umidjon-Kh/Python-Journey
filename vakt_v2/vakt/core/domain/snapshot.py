@@ -26,9 +26,7 @@ class Snapshot:
 
     Snapshot objects surface to the processing layer through Invokers such as
     BackupInvoker and RestoreInvoker, which call create() and restore() on the
-    SnapshotsRegistryStore implementation. BackupInvoker places the resulting
-    Snapshot into EventContext.metadata so that other handlers in the same
-    processing cycle can access it without coupling to a specific field on EventContext.
+    SnapshotsRegistryStore implementation.
 
     Attributes:
         - original_path: Absolute path to the file system object that was backed up.
