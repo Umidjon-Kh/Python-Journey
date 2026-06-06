@@ -55,15 +55,17 @@ class BaseInstructionRegistry(PortProtocol):
         - Thread-safety is not required by default. The Dispatcher only reads
             via get() and management operations occur in controlled Overseer sessions.
         - Graceful shutdown is handled by upper-layer objects, not the registry.
+        - Must never propagate exceptions to the caller. All errors must be caught
+            and handled internally.
     """
 
     @abstractmethod
-    def add(self, raw_instruction: dict) -> None:
+    def add(self, raw_instruction: dict) -> bool:
         """
         Constructs and stores an Instruction from a raw parameter dictionary.
 
         The registry validates the dictionary and builds the Instruction
-        internally. Raises ValueError if required keys are missing or invalid.
+        internally. Returns False if required keys are missing or invalid.
         Use sample() to discover the expected structure before calling this.
         Persisting after add is strongly advised.
         Intended only for management tools, not the Dispatcher.
