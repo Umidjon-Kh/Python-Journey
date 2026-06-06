@@ -2,6 +2,7 @@ from .configure import Configure
 from .event import CrossPlatformEventType, Event, EventType
 from .event_context import EventContext
 from .instruction import Instruction, InstructionType, LevelType
+from .snapshot import Snapshot
 
 __all__ = [
     "Configure",
@@ -12,4 +13,5 @@ __all__ = [
     "Instruction",
     "InstructionType",
     "LevelType",
+    "Snapshot",
 ]
