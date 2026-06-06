@@ -18,8 +18,8 @@ class BaseInstructionRegistry(PortProtocol):
 
     This separation allows developers to supply custom storage and matching
     logic without touching the pipeline. Examples:
-        - RegexInstructionRegistry:    matches by regex patterns.
-        - PriorityInstructionRegistry: matches by explicit priority rules.
+        - S3InstructionRegistry:        stores Instructions metadata in cloud.
+        - PriorityInstructionRegistry:  matches by explicit priority rules.
         - CompositeInstructionRegistry: chains multiple strategies together.
 
     Instruction Return Protocol:
