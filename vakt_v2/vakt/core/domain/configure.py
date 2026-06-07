@@ -37,6 +37,27 @@ class Configure:
         choose such values - doing so would violate the NYR (Not in Your Responbility)
         principle, custom law that i declared.
 
+    Ignoring_paths Protocol:
+        Any implementation that declares ignoring_paths in internal_reqs
+        must follow this protocol strictly:
+
+        ignoring_paths is a shared dict[str, int] where each value represents
+        the number of components currently holding an active ignore reference
+        to that path. A path is removed from ignoring_paths only when its
+        count reaches zero — meaning no component is actively ignoring it anymore.
+
+        Before starting any self-generated file system operation:
+            ignoring_paths[path] = ignoring_paths.get(path, 0) + 1
+
+        After all operations are complete:
+            ignoring_paths[path] -= 1
+            if ignoring_paths[path] == 0:
+                del ignoring_paths[path]
+
+        Never delete a path directly without decrementing — other components
+        may currently hold an active reference to the same path.
+
+
     Why Configure.__init__ avoids setattr:
         Deliberetely, no dynamic attribute setting occurs during Configure initialization.
         This allows Configure.check_out to reliably detect what has been supplied and what

@@ -62,9 +62,11 @@ class BasePathLocker(PortProtocol):
         this as an external change — triggering self-generated event handling for an
         operation the server itself initiated. All implementations must declare
         ignoring_paths in Configure.internal_reqs so that the Assembler provides
-        them with the shared ignoring_paths sequence. During acquire() the locked
-        path must be added to ignoring_paths with infinite count so the Dispatcher
-        silently skips it.
+        them with the shared ignoring_paths mapping sequence.During acquire() and
+        release() the implementation must increment ignoring_paths[path] before
+        starting any file system operation and decrement it immediately after
+        completing all operations — following the ignoring_paths Protocol
+        defined in Configure.
 
     PathLocker Categories:
         Like handlers, PathLocker implementations are not formally categorized in
@@ -114,10 +116,10 @@ class BasePathLocker(PortProtocol):
         Locks the file system object at path by renaming it with the .vakt.lock
         suffix and recording it in the persistent lock store.
 
-        Adds path to the shared ignoring_paths sequence with infinite count before
-        renaming to prevent the Observer from processing the rename as an external
-        event. Must be called before any critical operation on the object.
-        Must never propagate exceptions.
+        Increments ignoring_paths[path] before starting processing to prevent
+        the Observer from processing self-generated events. Decrements it back
+        after all operations are complete. Must be called before any critical
+        operation on the object. Must never propagate exceptions.
         """
         ...
 
@@ -127,9 +129,11 @@ class BasePathLocker(PortProtocol):
         Releases the lock on the file system object at path by restoring its
         original name and removing it from the persistent lock store.
 
-        Removes path from the shared ignoring_paths sequence after renaming.
-        path refers to the original path of the object before locking, not the
-        .vakt.lock path. Silently ignores if path is not currently locked.
-        Must never propagate exceptions.
+        Increments ignoring_paths[path] before starting processing to prevent
+        the Observer from processing self-generated events. Decrements it back
+        after all operations are complete. Removes the path entirely if the
+        count reaches zero. Path refers to the original path of the object before
+        locking, not the .vakt.lock path. Silently ignores if path is not currently
+        locked. Must never propagate exceptions.
         """
         ...
