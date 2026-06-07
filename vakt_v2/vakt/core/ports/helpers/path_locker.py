@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 
-from ..main.port_protocol import PortProtocol
+from ..main import PortProtocol
 
 
 class BasePathLocker(PortProtocol):

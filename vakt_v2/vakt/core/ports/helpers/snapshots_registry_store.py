@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import Any, Optional
 
 from ...domain import Snapshot
-from ..main.port_protocol import PortProtocol
+from ..main import PortProtocol
 
 
 class BaseSnapshotsRegistryStore(PortProtocol):

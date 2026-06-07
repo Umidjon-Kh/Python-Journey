@@ -16,6 +16,7 @@ from .ports import (
     BasePathLocker,
     BaseSnapshotsRegistryStore,
     BaseWatcher,
+    PortProtocol,
 )
 from .services import Dispatcher
 
@@ -29,6 +30,7 @@ __all__ = [
     "InstructionType",
     "LevelType",
     "Snapshot",
+    "PortProtocol",
     "BaseHandler",
     "BaseHeartBeater",
     "BaseInstructionRegistry",

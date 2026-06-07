@@ -4,6 +4,7 @@ from .main import (
     BaseHandler,
     BaseInstructionRegistry,
     BaseWatcher,
+    PortProtocol,
 )
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "BaseWatcher",
     "BasePathLocker",
     "BaseSnapshotsRegistryStore",
+    "PortProtocol",
 ]
