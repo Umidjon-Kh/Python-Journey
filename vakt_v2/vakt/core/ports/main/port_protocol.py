@@ -35,8 +35,9 @@ class PortProtocol(ABC):
         """
         ...
 
+    @classmethod
     @abstractmethod
-    def requirements(self) -> Configure:
+    def requirements(cls) -> Configure:
         """
         Returns the Configure dependency contract for this implementation.
 
@@ -59,8 +60,9 @@ class PortProtocol(ABC):
         """
         ...
 
+    @classmethod
     @abstractmethod
-    def describe(self) -> str:
+    def describe(cls) -> str:
         """
         Returns a one-sentence description of this implementation's purpose.
 
