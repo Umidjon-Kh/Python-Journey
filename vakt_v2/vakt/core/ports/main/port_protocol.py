@@ -44,11 +44,16 @@ class PortProtocol(ABC):
         and which parameters require explicit client input (with description
         and conversion/validation callable).
 
-        Must follow the NYR (Not Your Responsibility) principle: internal_reqs
-        must never include values that depend on client input. The only
-        permitted exception is placing a concrete implementation class in
-        internal_reqs — the Assembler will then resolve that implementation's
-        own client requirements on behalf of this one.
+        Must follow the DECLARATION PROTOCOL defined in Configure:
+            - internal_reqs must never include resources that require direct
+                client input. Such resources belong in client_reqs.
+            - Two forms are permitted in internal_reqs for resources that
+                indirectly involve the client:
+                "port:PortName" — client chooses the implementation.
+                "concrete:PortName::ImplementationName" — implementation is
+                hard-wired; Assembler resolves its client_reqs on behalf of
+                this one.
+            - Main pipeline objects must never appear in any requirements.
 
         For full details see Configure class documentation.
         """
