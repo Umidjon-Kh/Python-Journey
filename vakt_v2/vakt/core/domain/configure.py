@@ -27,7 +27,7 @@ class Configure:
                 supplied value before it is accepted by imp.__init__(configure: Configure).
 
         In contrast, internal_reqs is simply a tuple of requirement names that the
-        implementation excepts Assembler to provide (e.g., shutdown_event, ignoring_paths).
+        implementation excepts Assembler to provide (e.g., shutdown_event, occupied_paths).
 
     DECLARATION PROTOCOL:
         Implementation must never request from the internal provider (Assembler) any
@@ -35,27 +35,28 @@ class Configure:
         or implicitly depends on client input must be declared in client_reqs. This is hard
         requirement for correct instance creation. The Assembler cannot arbitrarily
         choose such values - doing so would violate the NYR (Not in Your Responbility)
-        principle, custom law that i declared.
+        principle, custom law that I declared.
 
-    Ignoring_paths Protocol:
-        Any implementation that declares ignoring_paths in internal_reqs
-        must follow this protocol strictly:
+    Occupied Paths Protocol:
+        Any implementation that declares occupied_paths in internal_reqs
+        must follow this protocol strictly.
 
-        ignoring_paths is a shared dict[str, int] where each value represents
-        the number of components currently holding an active ignore reference
-        to that path. A path is removed from ignoring_paths only when its
-        count reaches zero — meaning no component is actively ignoring it anymore.
+        occupied_paths is a shared dict[str, int] mapping each path to the
+        number of server components currently holding an active occupancy
+        claim on it. A path remains occupied as long as its count is above
+        zero — it is removed only when the last component releases its claim.
 
         Before starting any self-generated file system operation:
-            ignoring_paths[path] = ignoring_paths.get(path, 0) + 1
+            occupied_paths[path] = occupied_paths.get(path, 0) + 1
 
-        After all operations are complete:
-            ignoring_paths[path] -= 1
-            if ignoring_paths[path] == 0:
-                del ignoring_paths[path]
+        After all operations on that path are complete:
+            occupied_paths[path] -= 1
+            if occupied_paths[path] == 0:
+                del occupied_paths[path]
 
-        Never delete a path directly without decrementing — other components
-        may currently hold an active reference to the same path.
+        Never delete a path directly without decrementing — multiple
+        components may hold concurrent claims on the same path, and
+        a direct delete would silently invalidate all of them.
 
 
     Why Configure.__init__ avoids setattr:
@@ -80,7 +81,7 @@ class Configure:
         @classmethod
         def requirements(self) -> Configure:
             return Configure(
-                internal_reqs=("shutdown_event", "ignoring_paths", "ActionsLogger"),
+                internal_reqs=("shutdown_event", "occupied_paths", "ActionsLogger"),
                 client_reqs={
                     "registry_path": (
                         "Path of persistent registry JSON file",

@@ -55,17 +55,17 @@ class BasePathLocker(PortProtocol):
         processes. All modifications to the lock store must be persisted immediately.
         Atomic operations are strongly recommended to avoid corruption on crash.
 
-    Why all implementations must require ignoring_paths:
+    Why all implementations must require occupied_paths:
         When PathLocker renames a file system object to apply the .vakt.lock suffix,
         the Observer's Watcher detects this rename as a file system event. Without
-        ignoring_paths, the Watcher would enqueue this event into the shared buffer
+        occupied_paths, the Watcher would enqueue this event into the shared buffer
         and the Dispatcher would process it as an external change — triggering
         self-generated event handling for an operation the server itself initiated.
-        All implementations must declare ignoring_paths in Configure.internal_reqs
-        so that the Assembler provides them with the shared ignoring_paths mapping.
+        All implementations must declare occupied_paths in Configure.internal_reqs
+        so that the Assembler provides them with the shared occupied_paths mapping.
         During acquire() and release() the implementation must increment
-        ignoring_paths[path] before starting any file system operation and decrement
-        it immediately after completing all operations — following the ignoring_paths
+        occupied_paths[path] before starting any file system operation and decrement
+        it immediately after completing all operations — following the occupied_paths
         Protocol defined in Configure. The Watcher checks this mapping before
         enqueuing each event and silently drops any event whose path has an active
         ignore reference count greater than zero.
@@ -118,7 +118,7 @@ class BasePathLocker(PortProtocol):
         Locks the file system object at path by renaming it with the .vakt.lock
         suffix and recording it in the persistent lock store.
 
-        Increments ignoring_paths[path] before starting any file system operation
+        Increments occupied_paths[path] before starting any file system operation
         so the Watcher silently drops all self-generated events for this path.
         Decrements it back after all operations are complete. Must be called
         before any critical operation on the object.
@@ -132,10 +132,10 @@ class BasePathLocker(PortProtocol):
         Releases the lock on the file system object at path by restoring its
         original name and removing it from the persistent lock store.
 
-        Increments ignoring_paths[path] before starting any file system operation
+        Increments occupied_paths[path] before starting any file system operation
         so the Watcher silently drops all self-generated events for this path.
         Decrements it back after all operations are complete. Removes the path
-        entirely from ignoring_paths if the count reaches zero. Path refers to
+        entirely from occupied_paths if the count reaches zero. Path refers to
         the original path of the object before locking, not the .vakt.lock path.
         Silently ignores if path is not currently locked.
         Must never propagate exceptions.
