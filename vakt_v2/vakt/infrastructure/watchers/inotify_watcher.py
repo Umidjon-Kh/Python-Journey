@@ -29,6 +29,40 @@ _MASK: int = (
     | _FLAGS.EXCL_UNLINK
     | _FLAGS.DONT_FOLLOW
 )
+"""
+Combined INotify event mask applied to every watch descriptor.
+Three system events are delivered by the kernel regardless of this mask
+and are handled internally by INotifyWatcher:
+    - IN_IGNORED:    Delivered when a watch descriptor is automatically
+                     invalidated - either because the watched directory was
+                     deleted or because the file system was unmounted.
+                     INotifyWatcher removes the corresponding WatchNode,
+                     since the path no longer exists and cannot produce
+                     meaningful events.
+
+    - IN_UNMOUNT:    Delivered when the file system containing a watched path
+                     is unmounted. The kernel invalidates all watch descriptors
+                     on that file system immediately after, so IN_IGNORED
+                     follows for each of them. INotifyWatcher treats this
+                     identically to IN_IGNORED.
+
+    - IN_Q_OVERFLOW: Delivered when the kernel event queue overflowed and
+                     events were lost. Since the exact set of missed changes
+                     is unknown, INotifyWatcher discards all current state
+                     and performs a full rescan via _rescan() to restore a
+                     consistent view of the file system.
+
+Two special flags are included for defensive reasons:
+    - IN_EXCL_UNLINK: Supresses events for directories that have been unlinked
+                      but are still held open by another process - reduces
+                      unnecessary buffer noise.
+
+    - IN_DONT_FOLLOW: Prevents following symbolic links when adding watches,
+                      keeping observation within the expected directory tree.
+
+For the reasoning behind all other flag choices - including why IN_MODIFY
+is ommited - see INotifyEventType class documentation.
+"""
 
 _FILE_MASK_TO_EVENT: dict[int, INotifyEventType] = {
     _FLAGS.ACCESS: INotifyEventType.FILE_ACCESSED,
@@ -74,7 +108,7 @@ class WatchNode:
                 return parent.origin[0] + "/" + full_name
             parent = parent.parent
 
-        return full_name
+        return "/" + full_name
 
 
 class INotifyWatcher(BaseWatcher):
@@ -475,7 +509,10 @@ class INotifyWatcher(BaseWatcher):
 
         full_path = node.path + "/" + inotify_event.name
 
-        if full_path in self._occupied_paths or full_path in self._paths_to_ignore:
+        if (
+            self._occupied_paths.get(full_path, 0) > 0
+            or full_path in self._paths_to_ignore
+        ):
             return
 
         is_dir = bool(inotify_event.mask & _FLAGS.ISDIR)
