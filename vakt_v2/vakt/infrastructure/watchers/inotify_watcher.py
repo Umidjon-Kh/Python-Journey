@@ -153,7 +153,7 @@ class InotifyWatcher(BaseWatcher):
                     lambda x: (
                         x
                         if isinstance(x, bool)
-                        else x.lower() in ("true", "1", "yes")
+                        else x.lower() in {"true", "1", "yes"}
                         if isinstance(x, str)
                         else (_ for _ in ()).throw(ValueError("..."))
                     ),
@@ -162,7 +162,7 @@ class InotifyWatcher(BaseWatcher):
                     "...",
                     lambda x: (
                         v
-                        if (v := int(x)) >= 1
+                        if (v := int(x)) >= 200
                         else (_ for _ in ()).throw(ValueError("..."))
                     ),
                 ),
@@ -229,17 +229,21 @@ class InotifyWatcher(BaseWatcher):
             except OSError:
                 continue
 
-            node = WatchNode(
-                wd=wd,
-                name=current_path.rsplit("/", 1)[-1],
-                parent=current_parent if current_parent is not self._root else None,
-                recursive=True,
-                origin=(current_path.rsplit("/", 1)[0], True)
-                if current_parent is self._root
-                else None,
-            )
-            current_parent.children.append(node)
-            self._wd_to_node[wd] = node
+            if wd == current_parent.wd:
+                node = current_parent
+
+            else:
+                node = WatchNode(
+                    wd=wd,
+                    name=current_path.rsplit("/", 1)[-1],
+                    parent=current_parent if current_parent is not self._root else None,
+                    recursive=True,
+                    origin=(current_path.rsplit("/", 1)[0], True)
+                    if current_parent is self._root
+                    else None,
+                )
+                current_parent.children.append(node)
+                self._wd_to_node[wd] = node
 
             try:
                 for entry in scandir(current_path):
@@ -429,22 +433,30 @@ class InotifyWatcher(BaseWatcher):
                     previous_path=event.path,
                 )
             )
-            return
-
         else:
             if node is not None:
                 if node.origin is not None:
                     if node.origin[1] is True or new_parent.recursive:
+                        if node.origin[1] is False and node.recursive is False:
+                            self._subscribe_recursive(new_path, node)
                         adopt(new_parent, node, name)
-                        if node.origin[1] is True:
-                            autocorrect(new_path, event.path, node)
+                        autocorrect(new_path, event.path, node)
+
                     else:
                         self._orphan_descendants(node)
                 else:
                     if new_parent.recursive:
                         adopt(new_parent, node, name)
+                        if node.recursive is False:
+                            self._subscribe_recursive(new_path, node)
                     else:
-                        self._orphan_descendants(node)
+                        self._remove_node(node)
+            else:
+                if new_parent.recursive:
+                    self._subscribe_recursive(new_path, new_parent)
+                    autocorrect(
+                        new_path, event.path, get_child(new_parent, name, False)
+                    )
 
             self._buffer.put(
                 Event(
