@@ -1,3 +1,3 @@
-from .inotify_event_types import InotifyEventType
+from .inotify_event_types import INotifyEventType
 
-__all__ = ["InotifyEventType"]
+__all__ = ["INotifyEventType"]

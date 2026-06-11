@@ -3,7 +3,7 @@ from __future__ import annotations
 from ....core.domain import EventType
 
 
-class InotifyEventType(EventType):
+class INotifyEventType(EventType):
     """
     File system event types for implementations that observe via the
     Linux inotify kernel subsystem.
@@ -46,7 +46,7 @@ class InotifyEventType(EventType):
         - Implementations are responsible for determining whether an event
             belongs to a file or a directory. inotify delivers this information
             via the IN_ISDIR flag on each event — implementations must check
-            this flag themselves and produce the appropriate InotifyEventType
+            this flag themselves and produce the appropriate INotifyEventType
             (FILE_* or DIR_*) accordingly.
     """
 

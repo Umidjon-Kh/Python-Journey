@@ -14,7 +14,7 @@ from inotify_simple import INotify
 from inotify_simple import flags as _FLAGS
 
 from ...core import BaseWatcher, Configure, Event
-from ..semantic_types import InotifyEventType
+from ..semantic_types import INotifyEventType
 
 _MASK: int = (
     _FLAGS.CREATE
@@ -30,23 +30,22 @@ _MASK: int = (
     | _FLAGS.DONT_FOLLOW
 )
 
-
-_FILE_MASK_TO_EVENT: dict[int, InotifyEventType] = {
-    _FLAGS.ACCESS: InotifyEventType.FILE_ACCESSED,
-    _FLAGS.CREATE: InotifyEventType.FILE_CREATED,
-    _FLAGS.DELETE: InotifyEventType.FILE_DELETED,
-    _FLAGS.OPEN: InotifyEventType.FILE_OPENED,
-    _FLAGS.CLOSE_NOWRITE: InotifyEventType.FILE_CLOSED_NO_WRITE,
-    _FLAGS.CLOSE_WRITE: InotifyEventType.FILE_CLOSED_WRITE,
-    _FLAGS.ATTRIB: InotifyEventType.FILE_METADATA_CHANGED,
+_FILE_MASK_TO_EVENT: dict[int, INotifyEventType] = {
+    _FLAGS.ACCESS: INotifyEventType.FILE_ACCESSED,
+    _FLAGS.CREATE: INotifyEventType.FILE_CREATED,
+    _FLAGS.DELETE: INotifyEventType.FILE_DELETED,
+    _FLAGS.OPEN: INotifyEventType.FILE_OPENED,
+    _FLAGS.CLOSE_NOWRITE: INotifyEventType.FILE_CLOSED_NO_WRITE,
+    _FLAGS.CLOSE_WRITE: INotifyEventType.FILE_CLOSED_WRITE,
+    _FLAGS.ATTRIB: INotifyEventType.FILE_METADATA_CHANGED,
 }  # type: ignore[assignment]
 
-_DIR_MASK_TO_EVENT: dict[int, InotifyEventType] = {
-    _FLAGS.ACCESS: InotifyEventType.DIR_ACCESSED,
-    _FLAGS.CREATE: InotifyEventType.DIR_CREATED,
-    _FLAGS.DELETE: InotifyEventType.DIR_DELETED,
-    _FLAGS.ATTRIB: InotifyEventType.DIR_METADATA_CHANGED,
-    _FLAGS.OPEN: InotifyEventType.DIR_OPENED,
+_DIR_MASK_TO_EVENT: dict[int, INotifyEventType] = {
+    _FLAGS.ACCESS: INotifyEventType.DIR_ACCESSED,
+    _FLAGS.CREATE: INotifyEventType.DIR_CREATED,
+    _FLAGS.DELETE: INotifyEventType.DIR_DELETED,
+    _FLAGS.ATTRIB: INotifyEventType.DIR_METADATA_CHANGED,
+    _FLAGS.OPEN: INotifyEventType.DIR_OPENED,
 }  # type: ignore[assignment]
 
 
@@ -78,7 +77,7 @@ class WatchNode:
         return full_name
 
 
-class InotifyWatcher(BaseWatcher):
+class INotifyWatcher(BaseWatcher):
     """..."""
 
     def __init__(self, configure: Configure) -> None:
@@ -314,7 +313,7 @@ class InotifyWatcher(BaseWatcher):
             return
 
     @staticmethod
-    def _resolve(mask: int, is_dir: bool) -> InotifyEventType | None:
+    def _resolve(mask: int, is_dir: bool) -> INotifyEventType | None:
         """..."""
         mapping = _DIR_MASK_TO_EVENT if is_dir else _FILE_MASK_TO_EVENT
         for flag, event_type in mapping.items():
@@ -327,15 +326,15 @@ class InotifyWatcher(BaseWatcher):
         expired: list[int] = []
         for cookie, (old_parent, event, count) in self._pendings.items():
             if count >= self._pending_count:
-                if event.event_type is InotifyEventType.DIR_MOVED:
+                if event.event_type is INotifyEventType.DIR_MOVED:
                     if old_parent.recursive:
                         for node in old_parent.children:
                             if node.name == event.path.rsplit("/", 1)[-1]:
                                 self._remove_node(node)
                                 break
-                    event_type = InotifyEventType.DIR_DELETED
+                    event_type = INotifyEventType.DIR_DELETED
                 else:
-                    event_type = InotifyEventType.FILE_DELETED
+                    event_type = INotifyEventType.FILE_DELETED
 
                 self._buffer.put(
                     Event(
@@ -403,9 +402,9 @@ class InotifyWatcher(BaseWatcher):
             self._buffer.put(
                 Event(
                     path=new_path,
-                    event_type=InotifyEventType.DIR_CREATED
+                    event_type=INotifyEventType.DIR_CREATED
                     if is_dir
-                    else InotifyEventType.FILE_CREATED,  # type: ignore[assigment]
+                    else INotifyEventType.FILE_CREATED,  # type: ignore[assigment]
                     timestamp=monotonic(),
                 )
             )
@@ -426,9 +425,9 @@ class InotifyWatcher(BaseWatcher):
             self._buffer.put(
                 Event(
                     path=new_path,
-                    event_type=InotifyEventType.DIR_RENAMED
+                    event_type=INotifyEventType.DIR_RENAMED
                     if is_dir
-                    else InotifyEventType.FILE_RENAMED,  # type: ignore[assignment]
+                    else INotifyEventType.FILE_RENAMED,  # type: ignore[assignment]
                     timestamp=monotonic(),
                     previous_path=event.path,
                 )
@@ -483,7 +482,7 @@ class InotifyWatcher(BaseWatcher):
 
         if inotify_event.mask & _FLAGS.MOVED_FROM:
             event_type = (
-                InotifyEventType.DIR_MOVED if is_dir else InotifyEventType.FILE_MOVED
+                INotifyEventType.DIR_MOVED if is_dir else INotifyEventType.FILE_MOVED
             )
             event = Event(
                 path=full_path,
