@@ -29,7 +29,7 @@ class BaseWatcher(PortProtocol):
             - shutdown_event: responsible for graceful shutdown, managed by the common
                 ancestor, the upper-layer Observer object, which controls starting/stopping
                 and the entire Observer environment (Watcher and Dispatcher).
-            - thread-safe-buffer: a shared buffer accessible to both the Watcher and the
+            - thread_safe_buffer: a shared buffer accessible to both the Watcher and the
                 Dispatcher, acting as a pipeline between the threads. The Watcher places
                 events there, and they are later processed in the Dispatcher thread.
             - occupied_paths: a shared reference-counting mapping that signals which paths
