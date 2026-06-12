@@ -84,7 +84,61 @@ _DIR_MASK_TO_EVENT: dict[int, INotifyEventType] = {
 
 @dataclass(slots=True)
 class WatchNode:
-    """..."""
+    """
+    An internal mutable node used exclusively by INotifyWatcher to simulate
+    the observed directory tree in memory.
+
+    WatchNode was introduced to solve a fundamental limitation of the original
+    implementation, which stored watched paths as a flat mapping of watch
+    descriptor to path string. That approach made rename, move, and delete
+    operations prohibitively expensive — every path whose ancestor was affected
+    had to be located and updated individually. WatchNode replaces this with a
+    doubly-linked tree where each node knows its parent and children, reducing
+    rename, move, and delete to O(1) by mutating a single node's name rather
+    than scanning the entire registry.
+
+    Why WatchNode does not store the full path:
+        Storing the full path in each node would reintroduce the original problem —
+        every rename or move would require updating every affected descendant.
+        Instead, WatchNode stores only the directory name and a reference to its
+        parent. The full path is computed lazily via path(), which walks up the
+        parent chain until it finds a node with an origin and looks up its base
+        in an external registry maintained by INotifyWatcher. This means a rename
+        requires updating only a single node's name — all descendants reflect the
+        change automatically on their next path() call.
+
+        The fallback return "/" + full_name at the end of path() is a safety net
+        for those who enjoy stress-testing edge cases that will never occur in
+        production — since every client-selected path always carries an origin
+        and is always reachable before exhausting the parent chain.
+
+    Why origin is bool | None and not a richer type:
+        origin carries only the mode the client originally requested: True for
+        recursive, False for non-recursive, None for internal nodes that are not
+        client-selected. The base path previously stored alongside the mode has
+        been moved to an external registry in INotifyWatcher, keyed by watch
+        descriptor — eliminating the need to update origin on every rename or
+        move. A node whose origin is True remains recursive regardless of where
+        it moves — the client's intent never changes.
+
+    Attributes:
+        - wd:        Watch descriptor assigned by the kernel. Allows INotifyWatcher
+                        to locate nodes instantly through its internal registry without
+                        any traversal.
+        - name:      Directory name only — not the full path. Mutated in-place on
+                        rename or move, making O(1) path updates possible for the
+                        entire subtree.
+        - parent:    Reference to the parent WatchNode. None for client-selected
+                        root nodes — they have no logical parent in the observed tree.
+        - recursive: Whether subdirectories are observed recursively. May change
+                        during the node's lifetime. Consult origin for the client-
+                        requested mode.
+        - origin:    True if client selected this path recursively. False if
+                        non-recursively. None for internal nodes that are not
+                        client-selected.
+        - children:  Direct child WatchNodes currently subscribed under this node.
+                        Mutated on subscribe, unsubscribe, move, and delete.
+    """
 
     wd: int
     name: str
@@ -94,7 +148,15 @@ class WatchNode:
     children: list[WatchNode] = field(default_factory=list)
 
     def path(self, origins: dict[int, str]) -> str:
-        """..."""
+        """
+        Computes and returns the full absolute path of this node by walking
+        up the parent chain until an origin node is found, then prepending
+        its base from the external registry.
+
+        Args:
+            origins: External registry mapping watch descriptor to base path,
+                     maintained by INotifyWatcher.
+        """
         if self.origin is not None:
             return origins[self.wd] + "/" + self.name
 
