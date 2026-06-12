@@ -277,7 +277,6 @@ class INotifyWatcher(BaseWatcher):
                     name=name,
                     parent=current_parent,
                     recursive=True,
-                    origin=True if current_parent is None else None,
                 )
                 self._wd_to_node[wd] = node
                 if current_parent is not None:
@@ -288,6 +287,7 @@ class INotifyWatcher(BaseWatcher):
                     or current_path + "//**" in self._paths_to_observe
                 ):
                     self._hub[wd] = base
+                    node.origin = True
             try:
                 for entry in scandir(current_path):
                     if entry.is_dir(follow_symlinks=False):
@@ -308,6 +308,9 @@ class INotifyWatcher(BaseWatcher):
         node = self._wd_to_node.get(wd)
         if node is not None:
             node.origin = False
+            if node.recursive is True and node.parent is None:
+                self._orphan_descendants(node, True)
+                node.recursive = False
         else:
             node = WatchNode(
                 wd=wd,
@@ -316,7 +319,7 @@ class INotifyWatcher(BaseWatcher):
                 recursive=False,
                 origin=False,
             )
-        self._wd_to_node[wd] = node
+            self._wd_to_node[wd] = node
         self._hub[wd] = base
 
     def _autocorrect(self, after: str, before: str) -> None:
@@ -355,7 +358,6 @@ class INotifyWatcher(BaseWatcher):
                     continue
                 else:
                     self._hub.pop(current.wd, None)
-                    self._wd_to_node.pop(current.wd, None)
 
             if mode is True:
                 try:
@@ -366,6 +368,7 @@ class INotifyWatcher(BaseWatcher):
             stack.extend(current.children)
             current.children = []
             current.parent = None
+            self._wd_to_node.pop(current.wd, None)
         node.children = []
 
         if isinstance(mode, tuple):
@@ -374,6 +377,7 @@ class INotifyWatcher(BaseWatcher):
     def _remove_node(self, node: WatchNode, out_of_bounds: bool) -> None:
         """..."""
         self._wd_to_node.pop(node.wd, None)
+        self._hub.pop(node.wd, None)
         if node.parent is not None:
             try:
                 node.parent.children.remove(node)
