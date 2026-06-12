@@ -7,7 +7,6 @@ from queue import Queue
 from threading import Event as ShutdownEvent
 from threading import Thread
 from time import monotonic
-from weakref import WeakValueDictionary
 
 from inotify_simple import Event as IEvent
 from inotify_simple import INotify
@@ -87,17 +86,17 @@ _DIR_MASK_TO_EVENT: dict[int, INotifyEventType] = {
 class WatchNode:
     """..."""
 
-    wd: int = -1
-    name: str = ""
-    parent: WatchNode | None = None
-    recursive: bool = False
-    origin: tuple[str, bool] | None = None
+    wd: int
+    name: str
+    parent: WatchNode | None
+    recursive: bool
+    origin: bool | None = None
     children: list[WatchNode] = field(default_factory=list)
 
-    @property
-    def path(self) -> str:
+    def path(self, origins: dict[int, str]) -> str:
+        """..."""
         if self.origin is not None:
-            return self.origin[0] + "/" + self.name
+            return origins[self.wd] + "/" + self.name
 
         full_name = self.name
         parent = self.parent
@@ -105,7 +104,7 @@ class WatchNode:
         while parent is not None:
             full_name = parent.name + "/" + full_name
             if parent.origin is not None:
-                return parent.origin[0] + "/" + full_name
+                return origins[parent.wd] + "/" + full_name
             parent = parent.parent
 
         return "/" + full_name
@@ -119,15 +118,15 @@ class INotifyWatcher(BaseWatcher):
         self._buffer: Queue[Event] = getattr(configure, "thread_safe_buffer")
         self._shutdown_event: ShutdownEvent = getattr(configure, "shutdown_event")
         self._occupied_paths: dict[str, int] = getattr(configure, "occupied_paths")
-        self._paths_to_observe: list[str] = getattr(configure, "paths_to_observe")
+        self._paths_to_observe: set[str] = getattr(configure, "paths_to_observe")
         self._paths_to_ignore: set[str] = getattr(configure, "paths_to_ignore")
         self._auto_correction: bool = getattr(configure, "auto_correction")
         self._read_timeout: int = getattr(configure, "read_timeout")
         self._pending_count: int = getattr(configure, "pending_count")
         self._inotify: INotify = INotify()
         self._pendings: dict[int, tuple[WatchNode, Event, int]] = {}
-        self._root: WatchNode = WatchNode()
-        self._wd_to_node: WeakValueDictionary[int, WatchNode] = WeakValueDictionary()
+        self._hub: dict[int, str] = {}
+        self._wd_to_node: dict[int, WatchNode] = {}
         self._thread: Thread = Thread(target=self.events, daemon=True, name="Watcher")
 
     def start(self) -> None:
@@ -150,7 +149,7 @@ class INotifyWatcher(BaseWatcher):
                 if ie.mask & _FLAGS.IGNORED or ie.mask & _FLAGS.UNMOUNT:
                     node = self._wd_to_node.pop(ie.wd, None)
                     if node is not None:
-                        self._remove_node(node)
+                        self._remove_node(node, False)
                     continue
 
                 if ie.mask & _FLAGS.Q_OVERFLOW:
@@ -175,11 +174,11 @@ class INotifyWatcher(BaseWatcher):
             client_reqs={
                 "paths_to_observe": (
                     "...",
-                    lambda x: [p.strip() for p in x.split(",") if p.strip()],
+                    lambda x: {p.strip() for p in x.split(",") if p.strip()},
                 ),
                 "paths_to_ignore": (
                     "...",
-                    lambda x: set(p.strip() for p in x.split(",") if p.strip()),
+                    lambda x: {p.strip() for p in x.split(",") if p.strip()},
                 ),
                 "auto_correction": (
                     "...",
@@ -245,15 +244,13 @@ class INotifyWatcher(BaseWatcher):
             except OSError:
                 pass
 
-        self._root = WatchNode()
+        self._hub.clear()
         self._wd_to_node.clear()
         self._pendings.clear()
 
     def _subscribe_recursive(self, path: str, parent: WatchNode | None = None) -> None:
         """..."""
-        stack: list[tuple[str, WatchNode]] = [
-            (path, parent if parent is not None else self._root)
-        ]
+        stack: list[tuple[str, WatchNode | None]] = [(path, parent)]
 
         while stack:
             current_path, current_parent = stack.pop()
@@ -262,22 +259,35 @@ class INotifyWatcher(BaseWatcher):
             except OSError:
                 continue
 
-            if wd == current_parent.wd:
-                node = current_parent
+            if (
+                wd in self._hub
+                or current_parent is not None
+                and wd == current_parent.wd
+            ):
+                node = self._wd_to_node[wd]
+                if node.recursive:
+                    continue
+                node.recursive = True
 
             else:
+                base, name = current_path.rsplit("/", 1)
+
                 node = WatchNode(
                     wd=wd,
-                    name=current_path.rsplit("/", 1)[-1],
-                    parent=current_parent if current_parent is not self._root else None,
+                    name=name,
+                    parent=current_parent,
                     recursive=True,
-                    origin=(current_path.rsplit("/", 1)[0], True)
-                    if current_parent is self._root
-                    else None,
+                    origin=True if current_parent is None else None,
                 )
-                current_parent.children.append(node)
                 self._wd_to_node[wd] = node
-
+                if current_parent is not None:
+                    current_parent.children.append(node)
+                if (
+                    current_parent is None
+                    or current_path + "/**" in self._paths_to_observe
+                    or current_path + "//**" in self._paths_to_observe
+                ):
+                    self._hub[wd] = base
             try:
                 for entry in scandir(current_path):
                     if entry.is_dir(follow_symlinks=False):
@@ -297,50 +307,80 @@ class INotifyWatcher(BaseWatcher):
         base, name = path.rsplit("/", 1)
         node = self._wd_to_node.get(wd)
         if node is not None:
-            if node not in self._root.children:
-                node.origin = (base, False)
+            node.origin = False
         else:
             node = WatchNode(
                 wd=wd,
                 name=name,
                 parent=None,
                 recursive=False,
-                origin=(base, False),
+                origin=False,
             )
-            self._wd_to_node[wd] = node
-            self._root.children.append(node)
+        self._wd_to_node[wd] = node
+        self._hub[wd] = base
 
-    def _orphan_descendants(self, node: WatchNode) -> None:
+    def _autocorrect(self, after: str, before: str) -> None:
+        """..."""
+
+        for wd, base in self._hub.items():
+            if base.startswith(before):
+                new_base = after + base.removeprefix(before)
+                self._hub[wd] = new_base
+                node = self._wd_to_node[wd]
+                if self._auto_correction:
+                    old_path = base + "/" + node.name
+                    new_path = new_base + "/" + node.name
+                    if node.origin is True:
+                        self._paths_to_observe.discard(old_path + "/**")
+                        self._paths_to_observe.discard(old_path + "//**")
+                        self._paths_to_observe.add(new_path + "/**")
+                    else:
+                        self._paths_to_observe.discard(old_path + "/*")
+                        self._paths_to_observe.discard(old_path + "//*")
+                        self._paths_to_observe.add(new_path + "/*")
+
+    def _orphan_descendants(
+        self, node: WatchNode, mode: tuple[str, str] | bool
+    ) -> None:
         """..."""
         stack: list[WatchNode] = list(node.children)
 
         while stack:
             current = stack.pop()
-            try:
-                self._inotify.rm_watch(current.wd)
-            except OSError:
-                pass
+
+            if current.origin is not None:
+                if isinstance(mode, tuple):
+                    if current.origin is False:
+                        stack.extend(current.children)
+                    continue
+                else:
+                    self._hub.pop(current.wd, None)
+                    self._wd_to_node.pop(current.wd, None)
+
+            if mode is True:
+                try:
+                    self._inotify.rm_watch(current.wd)
+                except OSError:
+                    pass
 
             stack.extend(current.children)
             current.children = []
             current.parent = None
         node.children = []
 
-    def _remove_node(self, node: WatchNode) -> None:
+        if isinstance(mode, tuple):
+            self._autocorrect(mode[0], mode[1])
+
+    def _remove_node(self, node: WatchNode, out_of_bounds: bool) -> None:
         """..."""
+        self._wd_to_node.pop(node.wd, None)
         if node.parent is not None:
             try:
                 node.parent.children.remove(node)
             except ValueError:
                 pass
-        if node.origin is not None:
-            try:
-                self._root.children.remove(node)
-            except ValueError:
-                pass
         node.parent = None
-        self._orphan_descendants(node)
-
+        self._orphan_descendants(node, out_of_bounds)
         try:
             self._inotify.rm_watch(node.wd)
         except OSError:
@@ -364,7 +404,7 @@ class INotifyWatcher(BaseWatcher):
                     if old_parent.recursive:
                         for node in old_parent.children:
                             if node.name == event.path.rsplit("/", 1)[-1]:
-                                self._remove_node(node)
+                                self._remove_node(node, True)
                                 break
                     event_type = INotifyEventType.DIR_DELETED
                 else:
@@ -385,60 +425,38 @@ class INotifyWatcher(BaseWatcher):
             del self._pendings[cookie]
 
     def _handle_moved_to(
-        self, new_parent: WatchNode, full_path: str, cookie: int, is_dir: bool
+        self, new_parent: WatchNode, new_path: str, cookie: int, is_dir: bool
     ) -> None:
         """..."""
-        new_path = full_path
-        name = full_path.rsplit("/", 1)[-1]
+        name = new_path.rsplit("/", 1)[-1]
         pending = self._pendings.pop(cookie, None)
 
-        def adopt(parent: WatchNode, orphan: WatchNode, name: str) -> None:
-            orphan.name = name
-            orphan.parent = parent
-            parent.children.append(orphan)
-
-        def autocorrect(
-            new_path: str, old_path: str, node: WatchNode | None = None
-        ) -> None:
-            if self._auto_correction:
-                for index, raw in enumerate(self._paths_to_observe):
-                    if raw.endswith(("/**", "/*", "/")):
-                        path, suffix = raw.rsplit("/", 1)
-                    else:
-                        path, suffix = raw, ""
-                    if old_path == path.removesuffix("/"):
-                        if node is not None:
-                            if node.origin is not None:
-                                mode = node.origin[1]
-                            else:
-                                mode = True if suffix == "/**" else False
-                            node.origin = (new_path, mode)
-                            self._root.children.append(node)
-                        self._paths_to_observe[index] = new_path + "/" + suffix
-                        break
+        def adopt(parent: WatchNode, child: WatchNode, name: str) -> None:
+            child.name = name
+            child.parent = parent
+            parent.children.append(child)
 
         def get_child(parent: WatchNode, name: str, orphan: bool) -> WatchNode | None:
-            if parent.recursive:
-                for index, child in enumerate(parent.children):
-                    if child.name == name:
+            for index, child in enumerate(parent.children):
+                if child.name == name:
+                    if orphan:
+                        node = parent.children.pop(index)
+                        node.parent = None
+                    else:
                         node = parent.children[index]
-                        if orphan:
-                            parent.children.pop(index)
-                            node.parent = None
-                        return node
+                    return node
             return None
 
         if pending is None:
-            if is_dir:
-                if new_parent.recursive:
-                    self._subscribe_recursive(new_path, new_parent)
-                    autocorrect(new_path, new_path, get_child(new_parent, name, False))
+            if is_dir and new_parent.recursive:
+                self._subscribe_recursive(new_path, new_parent)
+
             self._buffer.put(
                 Event(
                     path=new_path,
                     event_type=INotifyEventType.DIR_CREATED
                     if is_dir
-                    else INotifyEventType.FILE_CREATED,  # type: ignore[assigment]
+                    else INotifyEventType.FILE_CREATED,  # type: ignore[assignment]
                     timestamp=monotonic(),
                 )
             )
@@ -453,8 +471,7 @@ class INotifyWatcher(BaseWatcher):
         if old_parent is new_parent:
             if node is not None:
                 adopt(new_parent, node, name)
-                if node.origin is not None:
-                    autocorrect(new_path, event.path, node)
+                self._autocorrect(new_path, event.path)
 
             self._buffer.put(
                 Event(
@@ -467,29 +484,28 @@ class INotifyWatcher(BaseWatcher):
                 )
             )
         else:
-            if node is not None:
-                if node.origin is not None:
-                    if node.origin[1] is True or new_parent.recursive:
-                        if node.origin[1] is False and node.recursive is False:
-                            self._subscribe_recursive(new_path, node)
-                        adopt(new_parent, node, name)
-                        autocorrect(new_path, event.path, node)
-
+            if is_dir:
+                if node is not None:
+                    if node.origin is not None:
+                        if node.origin is True or new_parent.recursive:
+                            if node.origin is False and node.recursive is False:
+                                self._subscribe_recursive(new_path, node)
+                            self._hub[node.wd] = new_path.rsplit("/", 1)[0]
+                            adopt(new_parent, node, name)
+                            self._autocorrect(new_path, event.path)
+                        else:
+                            self._orphan_descendants(node, (new_path, event.path))
                     else:
-                        self._orphan_descendants(node)
+                        if new_parent.recursive:
+                            adopt(new_parent, node, name)
+                            if node.recursive is False:
+                                self._subscribe_recursive(new_path, node)
+                            self._autocorrect(new_path, event.path)
+                        else:
+                            self._remove_node(node, True)
                 else:
                     if new_parent.recursive:
-                        adopt(new_parent, node, name)
-                        if node.recursive is False:
-                            self._subscribe_recursive(new_path, node)
-                    else:
-                        self._remove_node(node)
-            else:
-                if new_parent.recursive:
-                    self._subscribe_recursive(new_path, new_parent)
-                    autocorrect(
-                        new_path, event.path, get_child(new_parent, name, False)
-                    )
+                        self._subscribe_recursive(new_path, new_parent)
 
             self._buffer.put(
                 Event(
@@ -507,7 +523,7 @@ class INotifyWatcher(BaseWatcher):
         if node is None:
             return
 
-        full_path = node.path + "/" + inotify_event.name
+        full_path = node.path(self._hub) + "/" + inotify_event.name
 
         if (
             self._occupied_paths.get(full_path, 0) > 0
