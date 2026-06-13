@@ -490,7 +490,8 @@ class INotifyWatcher(BaseWatcher):
             to invoke.
 
         Called from _scan() during initial subscription and from _handle_moved_to()
-        when a new directory is created inside a recursive node.
+        when a new directory is created inside a recursive node or node that moved is
+        client-selected and its origin is True (means, need to trace recursively).
         """
         stack: list[tuple[str, WatchNode | None]] = [(path, parent)]
 
