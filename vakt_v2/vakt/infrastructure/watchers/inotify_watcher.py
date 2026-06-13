@@ -414,7 +414,60 @@ class INotifyWatcher(BaseWatcher):
         )
 
     def _scan(self) -> None:
-        """..."""
+        """
+        Iterates over _paths_to_observe and subscribes to all client-selected
+        directories by delegating to _subscribe_recursive() or
+        _subscribe_non_recursive() with correctly stripped paths.
+
+        All paths in _paths_to_observe must be absolute. Relative paths are
+        not normalised and will propagate as-is to add_watch(), which raises
+        OSError — the error surfaces to the caller unmodified.
+
+        Two-pass structure:
+            Recursive paths (ending with "/**") are subscribed first. Paths
+            with any other suffix, or no recognised suffix at all, are collected
+            into a deferred list and subscribed in a second pass as non-recursive.
+
+        Why recursive paths are subscribed first:
+            This ordering is the mechanism that enforces non-recursive priority.
+            If the client provides overlapping paths — the same directory with
+            both a recursive and a non-recursive suffix, or a non-recursive path
+            that falls inside an already-recursive subtree — processing recursive
+            paths first ensures that by the time the non-recursive pass runs,
+            every affected node already exists in _wd_to_node. _subscribe_non_recursive()
+            then finds those nodes and overrides their mode accordingly, orphaning
+            descendants where necessary. Reversing the order would break this
+            guarantee. Full priority mechanics are documented in
+            _subscribe_non_recursive() and _subscribe_recursive().
+            The practical consequence is also a resource saving: a directory
+            observed non-recursively generates events only for its immediate
+            children, eliminating the overhead of tracking an entire subtree
+            the client does not need.
+
+        Path normalisation and protection against malformed input:
+            Before passing a path to a subscription method, _scan() strips the
+            suffix that indicates the requested mode. This is done via a double
+            removesuffix() call rather than a single one.
+
+            Why double removesuffix():
+                Guards against client-supplied paths where the mode suffix is
+                preceded by an extra slash — for example "/etc/ssl//**" instead
+                of "/etc/ssl/**". The first removesuffix() strips the suffix
+                itself, the second strips any trailing slash left behind.
+                This is a deliberate defence against a class of typos that would
+                otherwise silently produce an incorrect subscription path.
+
+            Paths with no recognised suffix are treated as non-recursive by
+            default and receive additional validation: non-existent paths are
+            skipped silently, and paths that point to a file rather than a
+            directory are resolved to their parent directory before subscription.
+            This allows clients to provide file paths directly without causing
+            an error — the parent directory is subscribed and events for the
+            target file arrive through it, which is how inotify works regardless.
+
+        Called from start() during initial startup and from _rescan() after an
+        IN_Q_OVERFLOW to restore a consistent subscription state from scratch.
+        """
         non_recursive: list[str] = []
 
         for path in self._paths_to_observe:
@@ -436,12 +489,24 @@ class INotifyWatcher(BaseWatcher):
                 self._subscribe_non_recursive(path)
 
     def _rescan(self) -> None:
-        """..."""
+        """
+        Drops all active subscriptions and rebuilds them from scratch by
+        calling _unsubscribe_all() followed by _scan(). Called on
+        IN_Q_OVERFLOW when the kernel event queue overflowed and an unknown
+        number of events were lost — the only safe recovery is to discard
+        all current state and restore a consistent view of the file system.
+        """
         self._unsubscribe_all()
         self._scan()
 
     def _unsubscribe_all(self) -> None:
-        """..."""
+        """
+        Removes all active inotify watch descriptors and clears all internal
+        registries. OSError on rm_watch() is silently ignored — a descriptor
+        may have already been invalidated by the kernel before this call.
+        Called from _rescan() to reset state before a full rescan, and from
+        stop() during graceful shutdown.
+        """
         for wd in self._wd_to_node:
             try:
                 self._inotify.rm_watch(wd)
@@ -646,7 +711,76 @@ class INotifyWatcher(BaseWatcher):
     def _orphan_descendants(
         self, node: WatchNode, mode: tuple[str, str] | bool
     ) -> None:
-        """..."""
+        """
+        Detaches and removes all descendant WatchNodes of node from internal
+        state. Behaviour is controlled entirely by mode — the same traversal
+        logic serves three distinct lifecycle scenarios.
+
+        The caller is always responsible for updating the _hub entry of node
+        itself. _orphan_descendants handles only the descendants, never the
+        node passed as the root argument.
+
+        mode is True — out-of-bounds removal:
+            All descendants are removed and unsubscribed unconditionally,
+            including client-selected ones. rm_watch() is called on every
+            descendant watch descriptor, every node is detached from its
+            parent and cleared of its children, and all registries are updated.
+            Called when the subtree has moved outside the tracked directory tree
+            and can no longer be followed. Keeping stale watches in that state
+            would cause the watcher to deliver events referencing absolute paths
+            that no longer correspond to anything in the observable tree.
+            _autocorrect() is not called: there is no destination to correct to.
+
+        mode is False — physical deletion:
+            Descendants are detached and removed from internal state, but
+            rm_watch() is skipped. The kernel has already invalidated those
+            watch descriptors as a direct consequence of the deletion, so
+            calling rm_watch() on them would be a no-op at best. Client-selected
+            descendants are removed together with all others — a physically
+            deleted directory has no surviving location to track regardless of
+            how it was registered. _autocorrect() is not called: deletion is
+            intentionally excluded from auto-correction on both _hub and
+            _paths_to_observe. Removing a client selection on deletion would
+            overstep the watcher's role — the client chose that path and should
+            decide what to do with it.
+
+        mode is tuple[str, str] — cross-parent move with preserved origins:
+            First element is the new path prefix, second is the old path prefix.
+            Only non-client-selected descendants (origin is None) are removed
+            and unsubscribed. Client-selected descendants (origin is not None)
+            are left intact — they hold independent subscriptions that are not
+            subordinate to the moved node and must survive the move regardless
+            of what happens to their former parent.
+
+            Among client-selected descendants, origin=False nodes have their
+            children added to the traversal stack so that any nested
+            client-selected nodes inside them are also reached and preserved.
+            origin=True descendants skip that step — their subtree paths are
+            computed dynamically through the parent chain and _hub, so they
+            reflect the correct new location automatically once _autocorrect()
+            updates the relevant base entries.
+
+            rm_watch() is called on all removed non-client-selected descendants
+            — their watches are stale and would deliver events for directories
+            that no longer exist in the tracked tree.
+
+            _autocorrect() is invoked at the end to rewrite all _hub entries
+            whose base path starts with the old prefix, replacing it with the
+            new one, and updating _paths_to_observe when auto_correction is
+            enabled. See _autocorrect() for the full update contract.
+
+            Called only when a node moved to a new parent that does not require
+            recursion, the node itself carries origin=False, and the node was
+            previously recursive — meaning it accumulated descendants that now
+            need to be cleaned up while its client-selected children are
+            preserved independently.
+
+        node.children is cleared at the end in all modes. Traversal is
+        iterative and handles arbitrarily deep subtrees without call stack
+        growth.
+
+        Called from _remove_node() and _handle_moved_to().
+        """
         stack: list[WatchNode] = list(node.children)
 
         while stack:
@@ -676,7 +810,35 @@ class INotifyWatcher(BaseWatcher):
             self._autocorrect(mode[0], mode[1])
 
     def _remove_node(self, node: WatchNode, out_of_bounds: bool) -> None:
-        """..."""
+        """
+        Fully removes node and all of its descendants from internal state,
+        cleaning up every reference that INotifyWatcher holds to the subtree.
+
+        _remove_node handles node itself — removing it from _wd_to_node and
+        _hub, detaching it from its parent, and unsubscribing its watch
+        descriptor. Descendant cleanup is delegated to _orphan_descendants(),
+        which receives out_of_bounds directly to determine the appropriate
+        removal strategy for the subtree. Whether node is client-selected,
+        contains client-selected descendants, or is a plain internal node makes
+        no difference — the entire subtree is removed unconditionally.
+
+        ValueError on parent.children.remove():
+            Caught silently. Arises only in edge cases where the node was
+            already detached from its parent before _remove_node() was called —
+            for example, by an earlier _orphan_descendants() call in a
+            concurrent scenario or a stale IN_IGNORED delivery.
+
+        Called from:
+            - events(): on IN_IGNORED or IN_UNMOUNT, when the kernel
+                invalidates a watch descriptor due to deletion or unmounting.
+                out_of_bounds is False in this case.
+            - _flush_expired_pendings(): when a MOVED_FROM event expires
+                without a paired MOVED_TO, meaning the directory moved outside
+                the tracked tree. out_of_bounds is True in this case.
+            - _handle_moved_to(): when a tracked directory moves into a zone
+                that cannot support its current subscription mode.
+                out_of_bounds is True in this case.
+        """
         self._wd_to_node.pop(node.wd, None)
         self._hub.pop(node.wd, None)
         if node.parent is not None:
@@ -686,14 +848,24 @@ class INotifyWatcher(BaseWatcher):
                 pass
         node.parent = None
         self._orphan_descendants(node, out_of_bounds)
-        try:
-            self._inotify.rm_watch(node.wd)
-        except OSError:
-            return
+        if out_of_bounds:
+            try:
+                self._inotify.rm_watch(node.wd)
+            except OSError:
+                return
 
     @staticmethod
     def _resolve(mask: int, is_dir: bool) -> INotifyEventType | None:
-        """..."""
+        """
+        Maps a raw inotify event mask to the corresponding INotifyEventType.
+
+        Selects _DIR_MASK_TO_EVENT or _FILE_MASK_TO_EVENT based on is_dir,
+        then returns the first INotifyEventType whose flag is set in mask.
+        Returns None if no registered flag matches — this occurs when the
+        kernel delivers an internal or composite mask that falls outside the
+        flags declared in _MASK, in which case _handle() discards the event
+        silently.
+        """
         mapping = _DIR_MASK_TO_EVENT if is_dir else _FILE_MASK_TO_EVENT
         for flag, event_type in mapping.items():
             if mask & flag:
@@ -701,7 +873,54 @@ class INotifyWatcher(BaseWatcher):
         return None
 
     def _flush_expired_pendings(self) -> None:
-        """..."""
+        """
+        Advances every pending MOVED_FROM entry by one iteration and promotes
+        those that have waited too long to deletion events in the buffer.
+
+        Each entry in _pendings represents a MOVED_FROM event — a princess
+        waiting for her prince ("MOVED_TO") to arrive and complete the pair.
+        On every call, entries whose counter has reached or exceeded
+        pending_count are considered abandoned: the prince is not coming, and
+        the princess is emitted to the buffer as a deletion. Entries still
+        within the limit have their counter incremented by one and are left to
+        wait another iteration.
+
+        Expired entry handling:
+            The event type stored in the pending entry determines what gets
+            emitted — DIR_MOVED produces DIR_DELETED, FILE_MOVED produces
+            FILE_DELETED. The timestamp carried forward is the one captured at
+            the moment the original MOVED_FROM event arrived, accurately
+            reflecting when the object was last observed at its origin path
+            rather than when the expiry is detected.
+
+            If the pending event was a DIR_MOVED and the old parent node is
+            recursive — meaning it still tracks children and the moved
+            directory is among them — the corresponding WatchNode is located
+            by iterating over the old parent's children and removed entirely
+            along with all of its descendants (The dragon wipes them off the
+            face of the earth.). Without it, a WatchNode for a directory that
+            no longer exists in the tracked tree would remain in _wd_to_node
+            and _hub, silently delivering events that reference paths the
+            watcher can no longer resolve correctly.
+
+        Mutation safety:
+            Expired cookies are collected into a separate list during iteration
+            and deleted from _pendings in a second pass after the loop
+            completes, avoiding mutation of the dict while iterating over it.
+
+        Coupling with pending_count and read_timeout:
+            These two client-configurable parameters together define the window
+            within which a MOVED_TO must arrive to be treated as a move rather
+            than a deletion. read_timeout controls how frequently events() iterates
+            and therefore how often _flush_expired_pendings() is called.
+            pending_count controls how many of those iterations a princess is
+            allowed to wait for her prince before the watcher gives up and emits
+            a deletion. Tuning one without considering the other shifts the
+            balance between false deletions and delayed event delivery.
+
+        Called exclusively from events(), once per read() batch, after all
+        events in the batch have been processed.
+        """
         expired: list[int] = []
         for cookie, (old_parent, event, count) in self._pendings.items():
             if count >= self._pending_count:
