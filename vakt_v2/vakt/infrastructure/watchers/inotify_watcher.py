@@ -594,8 +594,16 @@ class INotifyWatcher(BaseWatcher):
                     or current_path + "/**" in self._paths_to_observe
                     or current_path + "//**" in self._paths_to_observe
                 ):
-                    self._hub[wd] = base
                     node.origin = True
+                    self._hub[wd] = base
+                elif (
+                    current_path + "/*" in self._paths_to_observe
+                    or current_path + "//*" in self._paths_to_observe
+                ):
+                    node.origin = False
+                    self._hub[wd] = base
+                else:
+                    pass
             try:
                 for entry in scandir(current_path):
                     if entry.is_dir(follow_symlinks=False):
@@ -603,7 +611,9 @@ class INotifyWatcher(BaseWatcher):
             except OSError:
                 pass
 
-    def _subscribe_non_recursive(self, path: str) -> None:
+    def _subscribe_non_recursive(
+        self, path: str, parent: WatchNode | None = None
+    ) -> None:
         """
         Subscribes to path without descending into its subdirectories.
 
@@ -647,12 +657,19 @@ class INotifyWatcher(BaseWatcher):
         except OSError:
             return
 
-        node = self._wd_to_node.get(wd)
+        node = self._wd_to_node.get(wd, None)
         if node is not None:
             node.origin = False
-            if node.recursive is True and node.parent is None:
-                self._orphan_descendants(node, True)
+            if node.recursive and node.parent is None:
                 node.recursive = False
+                self._orphan_descendants(node, True)
+            elif (
+                not node.recursive
+                and node.parent is not None
+                and node.parent.recursive is False
+            ):
+                node.recursive = False
+                self._orphan_descendants(node, True)
         else:
             base, name = path.rsplit("/", 1)
             node = WatchNode(
@@ -662,6 +679,9 @@ class INotifyWatcher(BaseWatcher):
                 recursive=False,
                 origin=False,
             )
+            if parent is not None:
+                node.parent = parent
+                parent.children.append(node)
             self._wd_to_node[wd] = node
             self._hub[wd] = base
 
@@ -955,6 +975,20 @@ class INotifyWatcher(BaseWatcher):
         name = new_path.rsplit("/", 1)[-1]
         pending = self._pendings.pop(cookie, None)
 
+        def clien_selected(path: str) -> str:
+            if (
+                path + "/**" in self._paths_to_observe
+                or path + "//**" in self._paths_to_observe
+            ):
+                return "/**"
+
+            elif (
+                path + "/*" in self._paths_to_observe
+                or path + "//*" in self._paths_to_observe
+            ):
+                return "/*"
+            return ""
+
         def adopt(parent: WatchNode, child: WatchNode, name: str) -> None:
             child.name = name
             child.parent = parent
@@ -972,8 +1006,16 @@ class INotifyWatcher(BaseWatcher):
             return None
 
         if pending is None:
-            if is_dir and new_parent.recursive:
-                self._subscribe_recursive(new_path, new_parent)
+            if is_dir:
+                if new_parent.recursive:
+                    self._subscribe_recursive(new_path, new_parent)
+                suffix = clien_selected(new_path)
+                if suffix == "/**":
+                    self._subscribe_recursive(new_path, new_parent)
+                elif suffix == "/*":
+                    self._subscribe_non_recursive(new_path, new_parent)
+                else:
+                    pass
 
             self._buffer.put(
                 Event(
@@ -1030,6 +1072,13 @@ class INotifyWatcher(BaseWatcher):
                 else:
                     if new_parent.recursive:
                         self._subscribe_recursive(new_path, new_parent)
+                    suffix = clien_selected(new_path)
+                    if suffix == "/**":
+                        self._subscribe_recursive(new_path, new_parent)
+                    elif suffix == "/*":
+                        self._subscribe_non_recursive(new_path, new_parent)
+                    else:
+                        pass
 
             self._buffer.put(
                 Event(
