@@ -567,16 +567,8 @@ class INotifyWatcher(BaseWatcher):
             except OSError:
                 continue
 
-            if (
-                wd in self._hub
-                or current_parent is not None
-                and wd == current_parent.wd
-            ):
-                node = self._wd_to_node[wd]
-                if node.recursive:
-                    continue
-                node.recursive = True
-
+            if wd in self._hub:
+                continue
             else:
                 base, name = current_path.rsplit("/", 1)
 
@@ -589,17 +581,12 @@ class INotifyWatcher(BaseWatcher):
                 self._wd_to_node[wd] = node
                 if current_parent is not None:
                     current_parent.children.append(node)
-                if (
-                    current_parent is None
-                    or current_path + "/**" in self._paths_to_observe
-                    or current_path + "//**" in self._paths_to_observe
-                ):
+
+                suffix = self._client_selected(current_path)
+                if current_parent is None or suffix == "/**":
                     node.origin = True
                     self._hub[wd] = base
-                elif (
-                    current_path + "/*" in self._paths_to_observe
-                    or current_path + "//*" in self._paths_to_observe
-                ):
+                elif suffix == "/*":
                     node.origin = False
                     self._hub[wd] = base
                 else:
@@ -658,20 +645,19 @@ class INotifyWatcher(BaseWatcher):
             return
 
         node = self._wd_to_node.get(wd, None)
+        base, name = path.rsplit("/", 1)
         if node is not None:
-            node.origin = False
-            if node.recursive and node.parent is None:
-                node.recursive = False
-                self._orphan_descendants(node, True)
-            elif (
-                not node.recursive
+            if (
+                node.recursive
+                and node.parent is None
+                or node.recursive
                 and node.parent is not None
                 and node.parent.recursive is False
             ):
                 node.recursive = False
                 self._orphan_descendants(node, True)
+            node.origin = False
         else:
-            base, name = path.rsplit("/", 1)
             node = WatchNode(
                 wd=wd,
                 name=name,
@@ -727,6 +713,20 @@ class INotifyWatcher(BaseWatcher):
                         self._paths_to_observe.discard(old_path + "/*")
                         self._paths_to_observe.discard(old_path + "//*")
                         self._paths_to_observe.add(new_path + "/*")
+
+    def _client_selected(self, path: str) -> str:
+        """..."""
+        if (
+            path + "//**" in self._paths_to_observe
+            or path + "/**" in self._paths_to_observe
+        ):
+            return "/**"
+        elif (
+            path + "//*" in self._paths_to_observe
+            or path + "/*" in self._paths_to_observe
+        ):
+            return "/*"
+        return ""
 
     def _orphan_descendants(
         self, node: WatchNode, mode: tuple[str, str] | bool
