@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from ...domain import Configure
+from ..domain import Configure
 
 
 class PortProtocol(ABC):

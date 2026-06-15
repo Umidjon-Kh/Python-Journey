@@ -4,15 +4,15 @@ from .main import (
     BaseHandler,
     BaseInstructionRegistry,
     BaseWatcher,
-    PortProtocol,
 )
+from .port_protocol import PortProtocol
 
 __all__ = [
+    "PortProtocol",
     "BaseHeartBeater",
     "BaseHandler",
     "BaseInstructionRegistry",
     "BaseWatcher",
     "BasePathLocker",
     "BaseSnapshotsRegistryStore",
-    "PortProtocol",
 ]

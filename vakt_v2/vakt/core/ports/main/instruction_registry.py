@@ -4,7 +4,7 @@ from abc import abstractmethod
 from collections.abc import Sequence
 
 from ...domain import Event, Instruction
-from .port_protocol import PortProtocol
+from ..port_protocol import PortProtocol
 
 
 class BaseInstructionRegistry(PortProtocol):

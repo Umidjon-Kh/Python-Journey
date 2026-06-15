@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod
 
 from ...domain import EventContext
-from .port_protocol import PortProtocol
+from ..port_protocol import PortProtocol
 
 
 class BaseHandler(PortProtocol):
