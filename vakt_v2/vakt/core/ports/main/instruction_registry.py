@@ -42,6 +42,23 @@ class BaseInstructionRegistry(AssemblyProtocol, BluePrintProtocol):
         arguments or filtering become involved, that logic belongs in a
         dedicated method exposed through blueprint() instead.
 
+    show() as a Registry Agreement:
+        No BaseRegistry exists in this codebase — nor is one planned.
+        Registry ports differ enough in pipeline role, structure, and observer
+        contract that unifying them under a shared abstract base would trade
+        clarity for a constraint that solves nothing the pipeline actually needs.
+
+        What show() establishes instead is a lightweight informal agreement
+        between ports that consider themselves registries: any such port carries
+        show() with a fixed signature — no arguments, raw metadata out. The
+        management layer gains a reliable baseline it can call uniformly across
+        all registry ports without coupling itself to the specific port type or
+        implementation in use. If a port is a registry, it has show(). No shared
+        inheritance required — presence is the contract.
+
+        Every registry port that adopts show() upholds the agreement by existing.
+        That is all the enforcement this convention needs.
+
     Who BaseInstructionRegistry is for:
         The Dispatcher calls get(). Management-layer objects such as
         RegistryManager call show() as a guaranteed baseline and interact
