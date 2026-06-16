@@ -4,127 +4,109 @@ from abc import abstractmethod
 from collections.abc import Sequence
 
 from ...domain import Event, Instruction
-from ..protocols import AssemblyProtocol
+from ..protocols import AssemblyProtocol, BluePrintProtocol
 
 
-class BaseInstructionRegistry(AssemblyProtocol):
+class BaseInstructionRegistry(AssemblyProtocol, BluePrintProtocol):
     """
     Abstract base class for all instruction registry implementations.
 
-    Combines two responsibilities:
-        1. Storage — manages a collection of domain Instruction objects.
-        2. Matching — selects the most appropriate Instruction for an
-            incoming Event using its own matching strategy.
+    BaseInstructionRegistry is simultaneously responsible for two things:
+        1. Matching — given an incoming Event, return the most appropriate
+            Instruction for it. This is the only thing the pipeline ever
+            asks of a registry.
+        2. Disclosure — returning the complete raw metadata of all registered
+            Instructions on demand, with no arguments required. This is the
+            guaranteed baseline that any management-layer object can always
+            rely on, regardless of which implementation is currently active.
 
-    This separation allows developers to supply custom storage and matching
-    logic without touching the pipeline. Examples:
-        - S3InstructionRegistry:        stores Instructions metadata in cloud.
-        - PriorityInstructionRegistry:  matches by explicit priority rules.
-        - CompositeInstructionRegistry: chains multiple strategies together.
+    Why only get() and show():
+        The Dispatcher is the sole pipeline object that ever touches a
+        registry at runtime, and all it ever needs is a matching Instruction
+        for a given Event. add(), delete(), clear(), were never pipeline
+        requirements — they were management requirements that leaked
+        into the port and imposed a rigid API on every implementation
+        regardless of whether that implementation even supports them.
+        BluePrintProtocol fixes this: every implementation now surfaces its
+        own management interface through blueprint(), where it declares
+        exactly the methods it actually has — no more, no less. Two
+        registries with completely different management models can coexist
+        behind the same port without either being forced to lie about
+        what it offers.
+
+        show() is the one exception: it stays on the port because it is
+        universal — every registry, regardless of its internal model, is
+        capable of returning its raw data with no arguments. It gives
+        management-layer objects a guaranteed baseline they can always call
+        without knowing anything about the specific implementation. The moment
+        arguments or filtering become involved, that logic belongs in a
+        dedicated method exposed through blueprint() instead.
+
+    Who BaseInstructionRegistry is for:
+        The Dispatcher calls get(). Management-layer objects such as
+        RegistryManager call show() as a guaranteed baseline and interact
+        with everything else through blueprint(). No other pipeline object
+        ever holds a reference to a registry directly. BaseInstructionRegistry
+        must never appear in any implementation's Configure requirements —
+        it belongs to the Observer environment and is assembled by the
+        Assembler itself.
 
     Instruction Return Protocol:
         get() must always return a valid Instruction. If no registered
-        instruction matches the event, the implementation must fall back
-        to a default Instruction — either determined automatically or
-        supplied by the client during configuration.
+        Instruction matches the incoming Event, the implementation must fall
+        back to a default Instruction — either determined automatically or
+        supplied by the client during configuration. get() never returns
+        None and never raises.
 
     Persistence Advisory:
         Implementations are strongly advised to persist registry state after
-        every modification. The Observer daemon itself only calls get() and
-        never modifies the registry, but the Overseer may concurrently modify
-        it through management sessions. A crash at any point must not result
-        in data loss.
+        every modification. The Dispatcher only ever reads via get() — it
+        never modifies. But management sessions running through the Overseer
+        may modify the registry concurrently with active observation. A crash
+        at any point must not result in data loss.
 
         Recommended approach:
-            - Persist after every add(), delete(), or clear().
-            - Use atomic writes (write to a temp file, then rename) to avoid
-                corrupting the registry file on crash.
+            - Persist after every modification.
+            - Use atomic writes (write to a .vakt.tmp file, then rename) to
+                avoid corrupting the registry on crash.
             - Restore persisted state during __init__.
 
-    Why add() accepts a raw dict instead of an Instruction:
-        Each registry implementation may require extra meta-parameters beyond
-        the Instruction fields themselves (e.g., priority, group, pattern).
-        Accepting a raw dict shifts construction and validation into the
-        implementation, keeping the external API clean and implementation-agnostic.
-        Use sample() to discover the expected structure before calling add().
-
     Notes:
-        - get() is called by the Dispatcher inside its thread.
-        - add(), delete(), clear(), show(), sample() are management-only —
-            never called by the Dispatcher.
-        - Thread-safety is not required by default. The Dispatcher only reads
-            via get() and management operations occur in controlled Overseer sessions.
+        - get() is called by the Dispatcher inside its thread. Must never raise.
+        - show() accepts no arguments. If an implementation has multiple
+            presentation modes or filtering variations, the recommended approach
+            is to expose a dedicated mode-setter method through blueprint()
+            that changes how show() behaves — not to add arguments to show()
+            itself. This preserves the universal contract.
+        - Thread-safety for get() is not required by default — the Dispatcher
+            only reads, and management modifications occur in controlled
+            Overseer sessions.
         - Graceful shutdown is handled by upper-layer objects, not the registry.
-        - Must never propagate exceptions to the caller. All errors must be caught
-            and handled internally.
+        - Must never propagate exceptions to the caller. All errors must be
+            caught and handled internally.
     """
-
-    @abstractmethod
-    def add(self, raw_instruction: dict) -> bool:
-        """
-        Constructs and stores an Instruction from a raw parameter dictionary.
-
-        The registry validates the dictionary and builds the Instruction
-        internally. Returns False if required keys are missing or invalid.
-        Use sample() to discover the expected structure before calling this.
-        Persisting after add is strongly advised.
-        Intended only for management tools, not the Dispatcher.
-        """
-        ...
 
     @abstractmethod
     def get(self, event: Event) -> Instruction:
         """
         Returns the most appropriate Instruction for the given Event.
 
-        Applies the implementation's matching strategy. Falls back to a
-        default Instruction if no registered instruction matches.
+        Applies the implementation's matching strategy against all registered
+        Instructions. Falls back to a default Instruction if no registered
+        Instruction matches — never returns None, never raises.
         Called by the Dispatcher within its thread.
-        """
-        ...
-
-    @abstractmethod
-    def delete(self, target: str) -> None:
-        """
-        Removes an Instruction identified by target.
-
-        The meaning of target is implementation-defined (index, name, pattern).
-        Silently ignores the request if target is not found.
-        Persisting after deletion is strongly advised.
-        Intended only for management tools.
-        """
-        ...
-
-    @abstractmethod
-    def clear(self) -> None:
-        """
-        Removes all Instructions from the registry.
-
-        Silently ignores the request if the registry is already empty.
-        Persisting after clearing is strongly advised.
-        Intended only for management tools.
         """
         ...
 
     @abstractmethod
     def show(self) -> Sequence[dict]:
         """
-        Returns all Instructions as raw parameter dictionaries.
+        Returns the complete raw metadata of all registered Instructions.
 
-        Each dict follows the same structure as sample() — the same keys
-        that were used when the Instruction was added via add().
-        Intended only for management tools.
-        """
-        ...
-
-    @abstractmethod
-    def sample(self) -> dict:
-        """
-        Returns a skeleton dictionary showing the expected structure for add().
-
-        Includes all Instruction fields and any registry-specific meta-parameters
-        (e.g., priority, group, pattern) with their expected types and whether
-        they are required or optional. Call this before add() to discover
-        what keys the registry expects.
+        Each dict in the returned sequence reflects the full internal
+        representation of one registered Instruction as the implementation
+        stores it — the same structure the implementation would use to
+        reconstruct it. Returns an empty sequence if the registry contains
+        no Instructions. Must never raise.
         """
         ...

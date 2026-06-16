@@ -58,6 +58,12 @@ class BluePrintProtocol(ABC):
         - The Assembler is the only object that performs the issubclass check.
             No other component has any business inspecting BluePrintProtocol
             directly.
+        - All methods exposed through blueprint() must declare proper named
+            parameters — never a raw dict as the sole argument. The management
+            layer invokes them as method(**resolved), where resolved is the
+            output of MethodSpec.resolve(). A method signature must therefore
+            match the keys declared in its MethodSpec requirements exactly —
+            plain arguments and **kwargs are permitted, a raw dict is not.
         - For full details about BluePrint, see its documentation.
     """
 
