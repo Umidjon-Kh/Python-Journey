@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 
-from ..domain import Configure
+from ...domain import Configure
 
 
-class PortProtocol(ABC):
+class AssemblyProtocol(ABC):
     """
     Lightweight internal interface that captures the common contract
     shared by all port implementations. Its sole purpose is to eliminate
@@ -11,7 +11,7 @@ class PortProtocol(ABC):
     __init__, requirements(), and describe() — so that port authors do not
     repeat the same explanations across every implementation.
 
-    The Assembler has no knowledge of PortProtocol and works entirely
+    The Assembler has no knowledge of AssemblyProtocol and works entirely
     with concrete classes. This protocol is purely a convenience that
     keeps the codebase DRY and self-documenting.
     """

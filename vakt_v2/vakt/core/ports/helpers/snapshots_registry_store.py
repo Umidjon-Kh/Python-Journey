@@ -5,10 +5,10 @@ from collections.abc import Sequence
 from typing import Any, Optional
 
 from ...domain import Snapshot
-from ..port_protocol import PortProtocol
+from ..protocols import AssemblyProtocol
 
 
-class BaseSnapshotsRegistryStore(PortProtocol):
+class BaseSnapshotsRegistryStore(AssemblyProtocol):
     """
     Abstract base class for all snapshot registry and storage implementations.
 

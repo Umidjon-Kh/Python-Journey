@@ -10,13 +10,13 @@ from .domain import (
     Snapshot,
 )
 from .ports import (
+    AssemblyProtocol,
     BaseHandler,
     BaseHeartBeater,
     BaseInstructionRegistry,
     BasePathLocker,
     BaseSnapshotsRegistryStore,
     BaseWatcher,
-    PortProtocol,
 )
 from .services import Dispatcher
 
@@ -30,7 +30,7 @@ __all__ = [
     "InstructionType",
     "LevelType",
     "Snapshot",
-    "PortProtocol",
+    "AssemblyProtocol",
     "BaseHandler",
     "BaseHeartBeater",
     "BaseInstructionRegistry",

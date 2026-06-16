@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from abc import abstractmethod
 
-from ..port_protocol import PortProtocol
+from ..protocols import AssemblyProtocol
 
 
-class BasePathLocker(PortProtocol):
+class BasePathLocker(AssemblyProtocol):
     """
     Abstract base class for all file system path locker implementations.
 

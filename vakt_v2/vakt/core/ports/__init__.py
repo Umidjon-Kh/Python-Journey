@@ -5,10 +5,10 @@ from .main import (
     BaseInstructionRegistry,
     BaseWatcher,
 )
-from .port_protocol import PortProtocol
+from .protocols import AssemblyProtocol
 
 __all__ = [
-    "PortProtocol",
+    "AssemblyProtocol",
     "BaseHeartBeater",
     "BaseHandler",
     "BaseInstructionRegistry",

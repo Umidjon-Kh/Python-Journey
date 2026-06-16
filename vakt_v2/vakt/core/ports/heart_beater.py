@@ -29,7 +29,7 @@ class BaseHeartBeater(ABC):
         guarantee the signal always arrives before the supervisor considers the
         server dead.
 
-    Why HeartBeater does not inherit from PortProtocol:
+    Why HeartBeater does not inherit from AssemblyProtocol:
         Unlike other ports, HeartBeater is not part of the Observer environment —
         it belongs to the Server itself and serves the Overseer directly. The client
         never decides which implementation to use or with what configuration.

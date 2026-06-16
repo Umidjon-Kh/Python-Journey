@@ -167,9 +167,9 @@ class BluePrint:
     the client may operate on a registry implementation that conforms to
     RegistryProtocol, and acts as the API the implementation delivers to
     RegistryManager so it can present those methods to the client via
-    IPCommunicator. Put plainly — BluePrint is the uniform RegistryManager
-    operates through to learn what capabilities are granted to the client,
-    independent of any implementation-specific details.
+    IPCommunicator. Put plainly — BluePrint is a protocol between the implementation
+    and the RegistryManager that lets you know what capabilities are granted to
+    the client, independent of any implementation-specific details.
 
     Every implementation inheriting from RegistryProtocol must deliver a fully
     constructed BluePrint through its blueprint() method. BluePrint constructs

@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ..core import (
+    AssemblyProtocol,
     BaseHandler,
     BaseInstructionRegistry,
     BasePathLocker,
     BaseSnapshotsRegistryStore,
     BaseWatcher,
-    PortProtocol,
 )
 
 
@@ -48,7 +48,7 @@ class InfraContainer:
         their instantiation logic is hardcoded directly into the Assembler - because
         HeartBeater does not belong to the Observer environment. It is owned by the
         Overseer (the server itself) and must never be presented to the client as a
-        choice. HeartBeater does not follow the Port Protocol - the Assembler selects
+        choice. HeartBeater does not follow the Assembly Protocol - the Assembler selects
         the appropriate implementation automatically based on the current platform,
         not the client.
 
@@ -67,7 +67,7 @@ class InfraContainer:
         requirements - no changes to Assembler internals required.
 
         The only contract: all helpers port implementations must inherit from
-        PortProtocol so the Assembler can work with them uniformly - discovering
+        AssemblyProtocol so the Assembler can work with them uniformly - discovering
         their requirements, presenting them to the client, and instantiating them
         correctly. The dict key must match the port name so the Assembler can locate
         all implementations for a given helper port when any object declares it
@@ -77,7 +77,7 @@ class InfraContainer:
     watchers: Sequence[type[BaseWatcher]] = []
     handlers: Sequence[type[BaseHandler]] = []
     instruction_registries: Sequence[type[BaseInstructionRegistry]] = []
-    helpers: dict[str, Sequence[type[PortProtocol]]] = {
+    helpers: dict[str, Sequence[type[AssemblyProtocol]]] = {
         BasePathLocker.__name__: [],
         BaseSnapshotsRegistryStore.__name__: [],
     }

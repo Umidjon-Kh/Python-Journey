@@ -4,10 +4,10 @@ from abc import abstractmethod
 from collections.abc import Sequence
 
 from ...domain import Event, Instruction
-from ..port_protocol import PortProtocol
+from ..protocols import AssemblyProtocol
 
 
-class BaseInstructionRegistry(PortProtocol):
+class BaseInstructionRegistry(AssemblyProtocol):
     """
     Abstract base class for all instruction registry implementations.
 

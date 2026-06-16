@@ -3,10 +3,10 @@ from __future__ import annotations
 from abc import abstractmethod
 
 from ...domain import EventContext
-from ..port_protocol import PortProtocol
+from ..protocols import AssemblyProtocol
 
 
-class BaseHandler(PortProtocol):
+class BaseHandler(AssemblyProtocol):
     """
     Abstract base class for all event handlers in the Dispatcher layer.
 
