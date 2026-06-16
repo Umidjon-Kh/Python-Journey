@@ -5,31 +5,58 @@ from typing import Any, Callable
 
 class Configure:
     """
-    Configure defines precisely what is needed to instantiate a port implementation.
-    It acts as a dependency declaration contract between the implementation and its
-    two suppliers: the internal provider (via Assembler) and the client. Each
-    implementation specifies its own Configure through a class method, describing
-    exactly what it requires and from whom.
+    The dependency declaration contract between an AssemblyProtocol
+    implementation and its two suppliers: the Assembler (internal) and
+    the client (external).
 
-    Why two separate arguments:
-        internal_reqs and client_reqs strictly partition all requirements. During
-        assembly, the Assembler resolves these using a lazy incremental dependency
-        graph. When populating an instance's requirements, it consults the client_reqs
-        dictionary and prompts the client for input as needed. For the full rationale
-        and details, see the Assembler class documentation.
+    Configure is the single artifact that every AssemblyProtocol
+    implementation must produce through its requirements() classmethod.
+    It declares precisely what the implementation needs and from whom —
+    nothing more, nothing less. The Assembler reads it, satisfies internal
+    requirements from its own environment, collects client requirements
+    through the Overseer, and calls resolve() to populate the contract
+    before passing it to __init__. This is the entire assembly contract
+    in one object.
+
+    Why two separate fields:
+        internal_reqs and client_reqs strictly partition all requirements.
+        internal_reqs names resources the Assembler provisions from its own
+        environment — shutdown_event, occupied_paths, or other implementations
+        via the port: and concrete: prefixes. client_reqs names everything
+        that requires a human response — values, paths, thresholds — paired
+        with a description and a Callable that validates or converts the raw
+        string input before it reaches the implementation.
+
+    Why Configure avoids setattr and getattr:
+        Configure is a declaration object, not a state container. Dynamic
+        attribute setting would turn it into a mutable scratchpad, blurring
+        the line between declaration and resolution and making attribute
+        presence checks with hasattr the only way to know what has been
+        supplied — fragile by design. Instead, resolve() delivers a clean,
+        structured result directly into self.resolved, a public mapping the
+        implementation reads from __init__ via configure.resolved["internal"]
+        and configure.resolved["client"]. No setattr, no getattr, no hidden
+        state — just a clear contract populated in one explicit call.
+
+    Why _provided exists:
+        The Assembler may need to surface the current provision state of
+        client requirements back to the client mid-session — for example,
+        to show what has already been supplied and what is still missing.
+        _provided stores every raw client-supplied string under its
+        requirement name, updated each time resolve() is called. client_reqs()
+        reads from _provided so the Assembler can present each requirement
+        alongside its current value, not just its description.
 
     Client Requirements Dictionary structure:
-        client_reqs is dict[str, tuple[str, Callable]]:
-            - The str in the tuple is a human-readable description of the parameter —
-                its purpose and expected value.
-            - The Callable lets the implementation supply a custom validation or
-                conversion function. It processes (validates or transforms) the
-                client-supplied value before it is accepted by
-                imp.__init__(configure: Configure).
-
-        In contrast, internal_reqs is simply a tuple of requirement names that the
-        implementation expects the Assembler to provide (e.g., shutdown_event,
-        occupied_paths).
+        client_reqs is dict[str, tuple[str, Callable[[str], Any]]]:
+            - The str in the tuple is a human-readable description of the
+                parameter — its purpose and expected value, presented to
+                the client by the Assembler before they supply a value.
+            - The Callable receives the client-supplied string, validates or
+                transforms it, and must always return the result. The return
+                value is what ends up in resolved["client"]. A Callable that
+                returns None on success would silently replace the client value
+                with None — always return the object itself.
 
     DECLARATION PROTOCOL:
         Implementations must never declare in internal_reqs any resource that
@@ -87,18 +114,6 @@ class Configure:
         may hold concurrent claims on the same path, and a direct delete would
         silently invalidate all of them.
 
-    Why Configure.__init__ avoids setattr:
-        Deliberately, no dynamic attribute setting occurs during Configure
-        initialization. This allows Configure.check_out() to reliably detect
-        what has been supplied and what is missing. During checkout, every
-        client-supplied parameter's presence is verified and its value is
-        validated or converted using its associated Callable. If any check
-        fails, the problem is immediately reported to the Assembler, which
-        forwards it to the Overseer. The Overseer in turn uses IPCommunicator
-        to inform the client about the incorrectly provided parameter. This
-        early validation prevents malformed instances and avoids runtime
-        crashes during creation.
-
     Usage Example:
         @classmethod
         def requirements(cls) -> Configure:
@@ -112,67 +127,123 @@ class Configure:
                 client_reqs={
                     "registry_path": (
                         "Absolute path to the persistent registry JSON file.",
-                        os.path.exists,
+                        Path,
                     ),
                     "rotation": (
                         "Snapshot rotation delay in seconds. Must be greater than zero.",
-                        lambda x: x if x > 0 else (_ for _ in ()).throw(ValueError(...)),
+                        lambda x: x if int(x) > 0 else (_ for _ in ()).throw(ValueError()),
                     ),
                 },
             )
 
     Notes:
         - All implementations must respect the DECLARATION PROTOCOL.
-        - Configure.client_reqs() returns a dictionary that strips the
-            Callable from each entry, exposing only the human-readable
-            description to the client.
+        - client_reqs() never exposes Callables — only the description and the
+            currently provided raw value (or "Empty" if not yet supplied).
+        - resolve() accepts client in the same dict[str, tuple[str, str]] format
+            that client_reqs() returns — the Assembler fills in the values and
+            passes the structure straight through without any restructuring.
+        - resolve() follows the same error protocol as MethodSpec.resolve():
+            KeyError if a required key is absent, ValueError if the Callable
+            raises. No partial result is ever produced.
+        - resolved is public by design — implementations read from it directly
+            in __init__ via configure.resolved["internal"] and
+            configure.resolved["client"]. No helper methods or indirection needed.
     """
 
     def __init__(
         self,
         internal_reqs: tuple[str, ...],
-        client_reqs: dict[str, tuple[str, Callable[[Any], Any]]],
+        client_reqs: dict[str, tuple[str, Callable[[str], Any]]],
     ) -> None:
         """
-        Initializes all seperated requirements for implementation
-        without setting attributes for params in both reqs.
+        Initializes the dependency contract without resolving anything.
+
+        No values are validated or transformed at this stage. Configure at
+        this point is a pure declaration — a structured description of what
+        the implementation will need once the Assembler begins assembly.
         """
         self._internal_reqs: tuple[str, ...] = internal_reqs
-        self._client_reqs: dict[str, tuple[str, Callable[[Any], Any]]] = client_reqs
+        self._client_reqs: dict[str, tuple[str, Callable[[str], Any]]] = client_reqs
+        self._provided: dict[str, str] = {}
+        self.resolved: dict[str, dict[str, Any]] = {"internal": {}, "client": {}}
 
     def internal_reqs(self) -> tuple[str, ...]:
+        """
+        Returns the sequence of internal requirement names declared by this
+        implementation.
+
+        Used by the Assembler to determine which resources it must provision
+        from its own environment before calling resolve().
+        """
         return self._internal_reqs
 
-    def client_reqs(self) -> dict[str, str]:
-        return {p: v for p, (v, _) in self._client_reqs.items()}
-
-    def check_out(self) -> None:
+    def client_reqs(self) -> dict[str, tuple[str, str]]:
         """
-        Validate and transform all client‑supplied requirements.
-        Internal dependencies are not checked because their provision by
-        the Assembler is architecturally guaranteed (NYR principle).
+        Returns a client-facing view of all client requirements alongside
+        their current provision state.
 
-        For each client parameter:
-        1. Verifies the attribute was set (KeyError if missing).
-        2. Applies the registered validation/conversion callable.
-        3. Overwrites the attribute with the transformed value on success.
+        For each declared client requirement, returns a tuple of:
+            (currently_provided_raw_value_or_"Empty", human_readable_description)
+
+        The first element reflects whatever raw string the client has already
+        supplied via resolve() — or "Empty" if the requirement has not yet
+        been provided. Used by the Assembler to present the full requirement
+        status to the client and to identify which parameters still need a value.
+        Never exposes Callables.
+        """
+        return {
+            param: (self._provided.get(param, "Empty"), desc)
+            for param, (desc, _) in self._client_reqs.items()
+        }
+
+    def resolve(
+        self,
+        internal: dict[str, Any],
+        client: dict[str, tuple[str, str]],
+    ) -> None:
+        """
+        Validates and resolves all requirements, populating self.resolved.
+
+        Called by the Assembler after both internal and client values have been
+        collected. client must carry the same structure that client_reqs() returns —
+        dict[str, tuple[str, str]] — where the first element of each tuple is the
+        raw value supplied by the client and the second element is the description.
+        This mirrors the output of client_reqs() exactly so the Assembler never
+        has to restructure the dict between the two calls — it receives the template,
+        fills in the values, and passes it straight through.
+
+        Internal values are stored directly into resolved["internal"]. For each
+        client requirement, the raw string is extracted from the tuple, recorded
+        in _provided so that client_reqs() can surface it, then passed through
+        its registered Callable — validated or transformed — and the result is
+        stored in resolved["client"].
+
+        The resolved dict is populated only when all client requirements pass
+        without error. A single missing or invalid argument raises immediately —
+        no partial result is ever produced.
 
         Raises:
-            KeyError: if a client requirement was not supplied.
-            ValueError: if the validation/conversion callable raises an exception.
+            KeyError:   if a client requirement is absent from provided.
+            ValueError: if the Callable raises for any supplied value.
         """
+        provided = {param: value for param, (value, _) in client.items()}
+        self._provided.update(provided)
+
+        for key in self._internal_reqs:
+            self.resolved["internal"][key] = internal[key]
+
         for param, (description, func) in self._client_reqs.items():
-            if not hasattr(self, param):
+            if param not in provided:
                 raise KeyError(
-                    f"Requirement {param!r} was not supplied."
+                    f"Requirement {param!r} was not supplied. "
                     f"Description: {description}."
                 )
             try:
-                value = getattr(self, param)
-                setattr(self, param, func(value))
+                self.resolved["client"][param] = func(provided[param])
             except Exception as exc:
                 raise ValueError(
-                    f"Requirement {param!r} value validation is failed."
-                    f"Problem: {exc}."
-                    f"Description: {description}"
+                    f"Requirement {param!r} validation failed. "
+                    f"Problem: {exc}. "
+                    f"Description: {description}."
                 ) from exc
