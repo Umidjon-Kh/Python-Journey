@@ -5,15 +5,19 @@ from ...domain import Configure
 
 class AssemblyProtocol(ABC):
     """
-    Lightweight internal interface that captures the common contract
-    shared by all port implementations. Its sole purpose is to eliminate
-    duplication by defining once the methods every port must provide —
-    __init__, requirements(), and describe() — so that port authors do not
-    repeat the same explanations across every implementation.
+    The common assembly contract that every Assembler-managed implementation
+    must satisfy.
 
-    The Assembler has no knowledge of AssemblyProtocol and works entirely
-    with concrete classes. This protocol is purely a convenience that
-    keeps the codebase DRY and self-documenting.
+    AssemblyProtocol exists for one reason: the Assembler must be able to
+    instantiate, introspect, and present any implementation without knowing
+    anything specific about it. Three methods make this possible —
+    __init__, requirements(), and describe() — and AssemblyProtocol defines
+    them once so that implementation authors do not repeat the same contract
+    across every class.
+
+    The Assembler works exclusively with concrete classes and has no
+    awareness of AssemblyProtocol itself. The protocol is a shared
+    authoring convenience, not a runtime mechanism.
     """
 
     @abstractmethod
