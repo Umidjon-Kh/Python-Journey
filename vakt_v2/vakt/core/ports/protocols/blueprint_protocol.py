@@ -45,6 +45,41 @@ class BluePrintProtocol(ABC):
         directly to a concrete implementation is a misuse of the pattern and
         breaks the layering contract this protocol was designed to enforce.
 
+    Current State — Informal Contracts:
+        Everything you see in this file — and everything connected to how
+        management objects interact with implementations — may change. The
+        project has taken too long already, and I (Umidjon) cannot afford
+        to delay delivery any further.
+
+        For now, all parties that build management objects work under
+        informal, unwritten contracts between themselves and the
+        implementations they manage. There is no enforced shared law, no
+        automatic wiring, no global roles. blueprint() is filled manually
+        by the implementation. It works — but it is NYR, and I know it.
+
+    What Is Coming — I Promise:
+        I will completely redo how BluePrints and management interaction
+        work. When that time comes, here is what lands:
+
+        - @blueprint() decorator — methods that carry it will register
+            themselves in the BluePrint automatically. No more building
+            it by hand. Full customisation and overrides built in.
+        - A formal shared law — a concrete contract that defines exactly
+            what is permitted and what is not between implementations and
+            the management objects that talk to them. Anyone consuming the
+            API will know what to expect without reading source.
+        - Global role plugins — RegistryPersonality, InvokerPersonality,
+            and others. A port declares its role; the framework wires the
+            appropriate management behaviour automatically.
+        - MethodSpec evolution — the ability to declare what must happen
+            after a method completes: a successful update emits a view
+            refresh command, a deletion triggers a cleanup hook, and so on.
+            The view does not rebuild from scratch. MethodSpec becomes a
+            full lifecycle declaration, not just a requirements contract.
+
+        Until then: what is here is interim. It is correct enough to ship.
+        It is not what this system deserves.
+
     Notes:
         - blueprint() is an instance method, not a classmethod. The management
             layer already holds the assembled instance — it calls blueprint()
