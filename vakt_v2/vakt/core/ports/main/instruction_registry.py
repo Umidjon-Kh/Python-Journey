@@ -15,10 +15,10 @@ class BaseInstructionRegistry(AssemblyProtocol, BluePrintProtocol):
         1. Matching — given an incoming Event, return the most appropriate
             Instruction for it. This is the only thing the pipeline ever
             asks of a registry.
-        2. Disclosure — returning the complete raw metadata of all registered
-            Instructions on demand, with no arguments required. This is the
-            guaranteed baseline that any management-layer object can always
-            rely on, regardless of which implementation is currently active.
+        2. Disclosure — exposing registry state through show(). This is the
+            guaranteed method every port that adopts the Registry Agreement
+            carries, giving the management layer a reliable entry point
+            regardless of which implementation is active.
 
     Why only get() and show():
         The Dispatcher is the sole pipeline object that ever touches a
@@ -34,13 +34,14 @@ class BaseInstructionRegistry(AssemblyProtocol, BluePrintProtocol):
         behind the same port without either being forced to lie about
         what it offers.
 
-        show() is the one exception: it stays on the port because it is
-        universal — every registry, regardless of its internal model, is
-        capable of returning its raw data with no arguments. It gives
-        management-layer objects a guaranteed baseline they can always call
-        without knowing anything about the specific implementation. The moment
-        arguments or filtering become involved, that logic belongs in a
-        dedicated method exposed through blueprint() instead.
+        show() is the one exception: it stays on the port as the guaranteed
+        baseline every registry exposes. Its arguments — what it accepts,
+        what it returns based on those arguments — are declared by each
+        implementation in its own MethodSpec inside blueprint(). An
+        implementation that requires no filtering declares a MethodSpec with
+        no requirements; one that offers filtering declares the parameters it
+        needs. Either way, the management layer always finds show() and always
+        reaches it through the standard BluePrint flow.
 
     show() as a Registry Agreement:
         No BaseRegistry exists in this codebase — nor is one planned.
@@ -48,25 +49,32 @@ class BaseInstructionRegistry(AssemblyProtocol, BluePrintProtocol):
         contract that unifying them under a shared abstract base would trade
         clarity for a constraint that solves nothing the pipeline actually needs.
 
-        What show() establishes instead is a lightweight informal agreement
-        between ports that consider themselves registries: any such port carries
-        show() with a fixed signature — no arguments, raw metadata out. The
-        management layer gains a reliable baseline it can call uniformly across
-        all registry ports without coupling itself to the specific port type or
-        implementation in use. If a port is a registry, it has show(). No shared
-        inheritance required — presence is the contract.
+        BluePrintProtocol is the contract between ports that want their
+        implementations to interact with management tools. show() is a
+        narrower declaration on top of that: any port that carries show()
+        is identifying itself as belonging to the registry role — signalling
+        that its implementations can, at minimum, expose their state to the
+        management layer. That is the Registry Agreement: an informal
+        convention between ports that share that role, not a formal law
+        enforced by shared inheritance.
 
-        Every registry port that adopts show() upholds the agreement by existing.
+        Declaring show() on the port is not strictly required by design —
+        BluePrintProtocol alone already ensures management tools can reach
+        the implementation. show() is declared here as a cushion: the abstract
+        method forces every concrete implementation to provide it, preventing
+        anyone from building an implementation that silently omits it.
+
+        Every port that carries show() upholds the agreement by existing.
         That is all the enforcement this convention needs.
 
     Who BaseInstructionRegistry is for:
         The Dispatcher calls get(). Management-layer objects such as
-        RegistryManager call show() as a guaranteed baseline and interact
-        with everything else through blueprint(). No other pipeline object
-        ever holds a reference to a registry directly. BaseInstructionRegistry
-        must never appear in any implementation's Configure requirements —
-        it belongs to the Observer environment and is assembled by the
-        Assembler itself.
+        RegistryManager reach show() through the BluePrint flow as a guaranteed
+        entry point and interact with everything else through blueprint(). No
+        other pipeline object ever holds a reference to a registry directly.
+        BaseInstructionRegistry must never appear in any implementation's
+        Configure requirements — it belongs to the Observer environment and
+        is assembled by the Assembler itself.
 
     Instruction Return Protocol:
         get() must always return a valid Instruction. If no registered
@@ -88,13 +96,23 @@ class BaseInstructionRegistry(AssemblyProtocol, BluePrintProtocol):
                 avoid corrupting the registry on crash.
             - Restore persisted state during __init__.
 
+    Current State — Temporary Pragmatic Contract:
+        Everything described here — including show() on the port, the Registry
+        Agreement, and how the management layer currently reaches registry
+        implementations — is a temporary, pragmatic arrangement. It ships
+        because the project cannot wait any longer. show() itself may not
+        survive the future redesign of the management system.
+
+        The full picture of what is coming — @blueprint() decorator,
+        formal shared law, global role plugins, MethodSpec evolution — is
+        documented in BluePrintProtocol. That is where the promise lives.
+
     Notes:
         - get() is called by the Dispatcher inside its thread. Must never raise.
-        - show() accepts no arguments. If an implementation has multiple
-            presentation modes or filtering variations, the recommended approach
-            is to expose a dedicated mode-setter method through blueprint()
-            that changes how show() behaves — not to add arguments to show()
-            itself. This preserves the universal contract.
+        - show(**kwargs) is invoked exclusively through the BluePrint flow —
+            never called directly by the management layer. kwargs are the
+            resolved output of the implementation's MethodSpec for show(),
+            provided by the client during the management session.
         - Thread-safety for get() is not required by default — the Dispatcher
             only reads, and management modifications occur in controlled
             Overseer sessions.
@@ -116,14 +134,17 @@ class BaseInstructionRegistry(AssemblyProtocol, BluePrintProtocol):
         ...
 
     @abstractmethod
-    def show(self) -> Sequence[dict]:
+    def show(self, **kwargs) -> Sequence[dict]:
         """
-        Returns the complete raw metadata of all registered Instructions.
+        Returns the raw metadata of registered Instructions.
 
-        Each dict in the returned sequence reflects the full internal
-        representation of one registered Instruction as the implementation
-        stores it — the same structure the implementation would use to
-        reconstruct it. Returns an empty sequence if the registry contains
-        no Instructions. Must never raise.
+        Invoked through the BluePrint flow — kwargs are the resolved output
+        of the implementation's MethodSpec for this method, provided by the
+        client during the management session. Each dict reflects the full
+        internal representation of one registered Instruction as the
+        implementation stores it — the same structure the implementation
+        would use to reconstruct it. Returns an empty sequence if the registry
+        contains no Instructions or no entries match the provided criteria.
+        Must never raise.
         """
         ...
