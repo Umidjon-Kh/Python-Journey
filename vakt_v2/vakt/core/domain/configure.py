@@ -97,22 +97,140 @@ class Configure:
         Any implementation that declares occupied_paths in internal_reqs
         must follow this protocol strictly.
 
-        occupied_paths is a shared dict[str, int] mapping each path to the
-        number of server components currently holding an active occupancy
-        claim on it. A path remains occupied as long as its count is above
-        zero — it is removed only when the last component releases its claim.
+        Why occupied_paths exists and who it is for:
+            Server components generate filesystem events as a natural side
+            effect of their own operations — acquiring locks, creating backups,
+            rotating snapshots, and so on. These self-generated events reach
+            the Watcher just like any external change would. Whether the
+            Watcher can tell the difference depends entirely on how deeply
+            it integrates with the kernel.
 
-        Before starting any self-generated file system operation:
-            occupied_paths[path] = occupied_paths.get(path, 0) + 1
+            Watcher implementations that hook deep into the kernel's
+            notification layer receive rich metadata about every event —
+            including which process initiated it. Such implementations can
+            identify self-generated events directly from that metadata and
+            drop them without any external help.
 
-        After all operations on that path are complete:
-            occupied_paths[path] -= 1
-            if occupied_paths[path] == 0:
-                del occupied_paths[path]
+            Watcher implementations that observe at the surface level —
+            receiving only the path and the type of change, with no visibility
+            into who within the server initiated it — have no such ability.
+            They see a change and cannot tell whether it came from outside
+            or from the server itself. occupied_paths is the shared contract
+            that gives these surface-level Watchers the information they need:
+            a live mapping of every path currently being operated on by the
+            server. Before enqueuing any event, a surface-level Watcher checks
+            occupied_paths — if the path is there, the event is self-generated
+            and must be dropped silently.
 
-        Never delete a path directly without decrementing — multiple components
-        may hold concurrent claims on the same path, and a direct delete would
-        silently invalidate all of them.
+        occupied_paths holds two distinct claim types side by side:
+
+            Exact claims — direct path keys:
+                occupied_paths[path] = count
+                Signals that the object at this exact path is currently being
+                operated on. count is a reference counter — more than one
+                component may hold a concurrent claim on the same path.
+
+            Recursive claims — nested under the "recursive" sentinel key:
+                occupied_paths["recursive"][path] = count
+                Signals that the object at this path and every descendant
+                beneath it are currently being operated on. "recursive" is a
+                safe sentinel: valid paths always start with "/" so no real
+                path can ever collide with it. The inner dict follows the same
+                reference-counting discipline as the outer one — count is
+                decremented on release and the entry is deleted when it hits
+                zero. When "recursive" itself becomes empty it is deleted from
+                occupied_paths entirely, so the mapping never accumulates dead
+                weight.
+
+        Who registers what — NYR applies here too:
+            Components that acquire locks or block access to a single object
+            register exact claims only — they know the path they were given
+            and nothing else. Whether the surrounding operation will cover a
+            full directory tree is not their responsibility. Callers that know
+            their operation is recursive must register the recursive claim
+            themselves, after the exact claim has been registered. The
+            component that acquires the lock will never do it on their behalf.
+
+        Vakt Suffix Rule:
+            Never register a path that carries a .vakt.** suffix in
+            occupied_paths. Always register the original clean path — the one
+            that existed before any vakt-marking rename. When an object is
+            renamed from file.txt to file.txt.vakt.lock on disk, the claim
+            goes under "file.txt", not "file.txt.vakt.lock". Registering the
+            suffixed name would silently break the Watcher's lookup — the
+            Watcher strips the vakt suffix to recover the original path, and
+            expects to find exactly that original path in occupied_paths.
+
+            One exception: if a parent directory in the path already carries a
+            .vakt.** suffix in its own name — meaning the parent itself is a
+            vakt-marked object — then children of that parent may be registered
+            under their full paths, vakt-marked parent segment included. The
+            parent's marker is not the child's marker. A child born in a locked
+            house is not itself the lock.
+
+        Registering a claim — before starting any self-generated operation:
+
+            Exact claim:
+                occupied_paths[path] = occupied_paths.get(path, 0) + 1
+
+            Recursive claim (when the operation covers the full tree under path):
+                recursive = occupied_paths.setdefault("recursive", {})
+                recursive[path] = recursive.get(path, 0) + 1
+
+        Releasing a claim — after all operations on that path are complete:
+
+            Exact claim:
+                occupied_paths[path] -= 1
+                if occupied_paths[path] == 0:
+                    del occupied_paths[path]
+
+            Recursive claim:
+                recursive = occupied_paths["recursive"]
+                recursive[path] -= 1
+                if recursive[path] == 0:
+                    del recursive[path]
+                if not recursive:
+                    del occupied_paths["recursive"]
+
+            Never delete a path directly without decrementing first — multiple
+            components may hold concurrent claims on the same path, and a
+            direct delete would silently invalidate all of them.
+
+        Watcher Lookup Protocol:
+            Surface-level Watcher implementations must check occupied_paths
+            before enqueuing each event. The check follows three steps in
+            strict order — if any step returns True, the event is self-generated
+            and must be dropped silently, never enqueued:
+
+            Step 1 — exact match:
+                occupied_paths.get(event_path, 0) > 0
+
+            Step 2 — recursive match:
+                any(
+                    event_path.startswith(p + "/") and count > 0
+                    for p, count in occupied_paths.get("recursive", {}).items()
+                )
+
+            Step 3 — vakt suffix strip, then repeat steps 1 and 2:
+                idx = event_path.rfind(".vakt.")
+                if idx != -1:
+                    clean = event_path[:idx]
+                    repeat step 1 on clean
+                    repeat step 2 on clean
+
+            rfind is mandatory here — not find. A path may contain a
+            vakt-marked parent directory somewhere in its ancestry, which
+            means ".vakt." can appear earlier in the string than the suffix
+            on the object itself. find would match that earlier occurrence
+            and strip too much, producing a wrong clean path. rfind always
+            finds the rightmost ".vakt." — the one that belongs to the
+            object, not to a parent.
+
+            Deep-integration Watcher implementations that receive kernel-level
+            event metadata must check whether the initiating process matches
+            the server's own process and drop the event if it does. For such
+            implementations, occupied_paths filtering is not required and may
+            be skipped entirely.
 
     Usage Example:
         @classmethod
