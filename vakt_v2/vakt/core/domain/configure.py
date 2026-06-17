@@ -140,16 +140,9 @@ class Configure:
                 decremented on release and the entry is deleted when it hits
                 zero. When "recursive" itself becomes empty it is deleted from
                 occupied_paths entirely, so the mapping never accumulates dead
-                weight.
-
-        Who registers what — NYR applies here too:
-            Components that acquire locks or block access to a single object
-            register exact claims only — they know the path they were given
-            and nothing else. Whether the surrounding operation will cover a
-            full directory tree is not their responsibility. Callers that know
-            their operation is recursive must register the recursive claim
-            themselves, after the exact claim has been registered. The
-            component that acquires the lock will never do it on their behalf.
+                weight. Registering a recursive claim is always the caller's
+                responsibility — the component that holds the exact claim on
+                the same path never registers it on the caller's behalf.
 
         Vakt Suffix Rule:
             Never register a path that carries a .vakt.** suffix in
