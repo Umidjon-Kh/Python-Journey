@@ -1,4 +1,5 @@
 from .domain import (
+    BluePrint,
     Configure,
     CrossPlatformEventType,
     Event,
@@ -17,11 +18,13 @@ from .ports import (
     BasePathLocker,
     BaseSnapshotsRegistryStore,
     BaseWatcher,
+    BluePrintProtocol,
 )
 from .services import Dispatcher
 
 __all__ = [
     "Configure",
+    "BluePrint",
     "CrossPlatformEventType",
     "Event",
     "EventContext",
@@ -31,6 +34,7 @@ __all__ = [
     "LevelType",
     "Snapshot",
     "AssemblyProtocol",
+    "BluePrintProtocol",
     "BaseHandler",
     "BaseHeartBeater",
     "BaseInstructionRegistry",
