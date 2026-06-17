@@ -258,13 +258,14 @@ class BluePrint:
         - BluePrint must be created once per blueprint() call and must never be
             cached between sessions. The management layer holds it for the duration
             of a single management session only.
-        - BluePrint has no knowledge of the registry instance it was created from.
+        - BluePrint has no knowledge of the implementation instance it was created from.
             Method invocation is the sole responsibility of the management layer,
             which calls getattr(registry_instance, name) after all requirements
             are resolved by MethodSpec.resolve().
-        - Only the RegistryProtocol implementation may call blueprint(). No other
-            object — not even the Assembler — may construct or interact with
-            BluePrint directly.
+        - Management-layer objects are the only callers of blueprint() and the
+            only consumers of the BluePrint it returns. No other component — not
+            even the Assembler — has any business constructing or interacting
+            with BluePrint directly.
     """
 
     def __init__(
