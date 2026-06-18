@@ -17,15 +17,8 @@ class BasePathLocker(AssemblyProtocol):
 
     This gives other components the ability to safely interact with a file system
     object during critical operations without the risk of external modification or
-    reading. For example, SnapshotsRegistryStore restoring or creating a backup
-    can rely on PathLocker to ensure no one else modifies or reads the object
-    during its work. Same applies to any other component that requires exclusive
-    access to a file system object.
-
-    PathLocker is a helper infrastructure component designed to assist objects
-    that require safe interaction with file system objects during critical operations.
-    It is not a core pipeline element and does not participate in event processing
-    directly.
+    reading. PathLocker is a helper infrastructure component — it is not a core
+    pipeline element and does not participate in event processing directly.
 
     Marking Protocol:
         All implementations must rename locked objects by appending the .vakt.lock
@@ -55,20 +48,40 @@ class BasePathLocker(AssemblyProtocol):
         processes. All modifications to the lock store must be persisted immediately.
         Atomic operations are strongly recommended to avoid corruption on crash.
 
-    Why all implementations must require occupied_paths:
-        When PathLocker renames a file system object to apply the .vakt.lock suffix,
-        the Observer's Watcher detects this rename as a file system event. Without
-        occupied_paths, the Watcher would enqueue this event into the shared buffer
-        and the Dispatcher would process it as an external change — triggering
-        self-generated event handling for an operation the server itself initiated.
-        All implementations must declare occupied_paths in Configure.internal_reqs
-        so that the Assembler provides them with the shared occupied_paths mapping.
-        During acquire() and release() the implementation must increment
-        occupied_paths[path] before starting any file system operation and decrement
-        it immediately after completing all operations — following the occupied_paths
-        Protocol defined in Configure. The Watcher checks this mapping before
-        enqueuing each event and silently drops any event whose path has an active
-        ignore reference count greater than zero.
+    occupied_paths Protocol:
+        When PathLocker renames a file system object to apply the .vakt.lock
+        suffix, the Watcher detects this rename as a file system event. Whether
+        the Watcher can identify it as self-generated depends entirely on the
+        implementation — deep-integration Watchers can detect the initiating
+        process directly, surface-level ones cannot. PathLocker has no visibility
+        into which Watcher is deployed and must never depend on that. All
+        implementations must declare occupied_paths in Configure.internal_reqs
+        and register their path claims unconditionally — this guarantees correct
+        filtering regardless of which Watcher implementation is in use
+
+        PathLocker registers and releases exact claims only. Before starting any
+        file system operation — renaming to apply or remove the .vakt.lock suffix —
+        the implementation registers an exact claim:
+            occupied_paths[path] = occupied_paths.get(path, 0) + 1
+        Once all operations on that path are complete, it releases it:
+            occupied_paths[path] -= 1
+            if occupied_paths[path] == 0:
+                del occupied_paths[path]
+
+        PathLocker never registers recursive claims. Whether the surrounding
+        operation covers a full directory tree is not something PathLocker knows
+        or decides — NYR. Callers that need recursive coverage register it
+        themselves in occupied_paths["recursive"] after PathLocker has registered
+        the exact claim on their behalf.
+
+        Path Registration Rule:
+            Always register the original clean path — the one that existed before
+            any .vakt.** rename. When file.txt is renamed to file.txt.vakt.lock,
+            the claim goes under "file.txt", not "file.txt.vakt.lock". Registering
+            the suffixed path would break the Watcher's lookup — it strips the
+            .vakt. suffix to recover the original path and expects to find exactly
+            that in occupied_paths. For the full suffix-stripping algorithm see
+            BaseWatcher and Configure documentation.
 
     PathLocker Categories:
         Like handlers, PathLocker implementations are not formally categorized in
@@ -118,11 +131,10 @@ class BasePathLocker(AssemblyProtocol):
         Locks the file system object at path by renaming it with the .vakt.lock
         suffix and recording it in the persistent lock store.
 
-        Increments occupied_paths[path] before starting any file system operation
-        so the Watcher silently drops all self-generated events for this path.
-        Decrements it back after all operations are complete. Must be called
-        before any critical operation on the object.
-        Must never propagate exceptions.
+        Registers an exact claim in occupied_paths under the original clean path
+        before any file system operation, so the Watcher silently drops all
+        self-generated rename events. Releases the claim once all acquire
+        operations are complete. Must never propagate exceptions.
         """
         ...
 
@@ -132,12 +144,12 @@ class BasePathLocker(AssemblyProtocol):
         Releases the lock on the file system object at path by restoring its
         original name and removing it from the persistent lock store.
 
-        Increments occupied_paths[path] before starting any file system operation
-        so the Watcher silently drops all self-generated events for this path.
-        Decrements it back after all operations are complete. Removes the path
-        entirely from occupied_paths if the count reaches zero. Path refers to
-        the original path of the object before locking, not the .vakt.lock path.
-        Silently ignores if path is not currently locked.
+        Registers an exact claim in occupied_paths under the original clean path
+        before any file system operation, so the Watcher silently drops all
+        self-generated rename events. Releases the claim once all release
+        operations are complete. Removes path from occupied_paths entirely when
+        the count reaches zero. path is always the original path before locking —
+        never the .vakt.lock path. Silently ignores if path is not currently locked.
         Must never propagate exceptions.
         """
         ...
